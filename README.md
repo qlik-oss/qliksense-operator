@@ -20,7 +20,7 @@ manifests-root
 |  |  |--kustomization.yaml
 ```
 
-It works based on CR config yaml in environment variable `YAML_ENV`. The CR config looks like this
+It works based on CR config yaml in environment variable `YAML_CONF`. The CR config looks like this
 
 ```yaml
 configProfile: manifests/base
