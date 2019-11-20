@@ -3,20 +3,22 @@ package qust
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Shopify/ejson"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/qlik-oss/qliksense-operator/pkg/keys"
-
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
+	"github.com/qlik-oss/qliksense-operator/pkg/keys"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v2"
 )
 
 func TestSetupServiceSecretsDirectory(t *testing.T) {
-	tmpManifestsRootDir, err := setupTmpManifestsRootDir(t, "TestSetupServiceSecretsDirectory-")
+	publicKey, _, err := ejson.GenerateKeypair()
+	tmpManifestsRootDir, err := setupTests(t, "TestSetupServiceSecretsDirectory-", publicKey)
 	if err == nil {
 		defer func() {
 			err := os.RemoveAll(tmpManifestsRootDir)
@@ -48,9 +50,10 @@ func TestSetupServiceSecretsDirectory(t *testing.T) {
 }
 
 func TestWriteServiceEpriviteKeyJsonFile(t *testing.T) {
-	tmpManifestsRootDir, err := setupTmpManifestsRootDir(t, "TestWriteServiceEpriviteKeyJsonFile-")
+	publicKey, privateKey, err := ejson.GenerateKeypair()
+	tmpManifestsRootDir, err := setupTests(t, "TestWriteServiceEpriviteKeyJsonFile-", publicKey)
 	if err == nil {
-		defer func(){
+		defer func() {
 			err := os.RemoveAll(tmpManifestsRootDir)
 			if err != nil {
 				fmt.Printf("Error deleting test tmp directory: %v\n", err)
@@ -72,14 +75,15 @@ func TestWriteServiceEpriviteKeyJsonFile(t *testing.T) {
 	err = os.Mkdir(filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/foo"), 0777)
 	assert.NoError(t, err)
 
-	privateKeyUnescaped := service.PrivateKey
 	service.PrivateKey = strings.Replace(service.PrivateKey, "\n", "\\n", -1)
 	err = writeServiceEpriviteKeyJsonFile(cr, service)
 	assert.NoError(t, err)
 
-	ePrivateKeyJsonFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/foo/eprivate_key.json")
-	assert.FileExists(t, ePrivateKeyJsonFilePath)
+	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, service.Name, privateKey)
+}
 
+func verifyServiceEpriviteKeyJsonFile(t *testing.T, tmpManifestsRootDir string, serviceName string, privateKey string) {
+	ePrivateKeyJsonFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, fmt.Sprintf("secrets/%v/eprivate_key.json", serviceName))
 	ePrivateKeyJsonFileBytes, err := ioutil.ReadFile(ePrivateKeyJsonFilePath)
 	assert.NoError(t, err)
 
@@ -87,17 +91,161 @@ func TestWriteServiceEpriviteKeyJsonFile(t *testing.T) {
 	err = json.Unmarshal(ePrivateKeyJsonFileBytes, &ePrivateKeyJsonMap)
 	assert.NoError(t, err)
 
-	assert.Equal(t, privateKeyUnescaped, ePrivateKeyJsonMap["private_key"])
-	assert.Equal(t, service.Kid, ePrivateKeyJsonMap["kid"])
+	_, privateKeyPropExists := ePrivateKeyJsonMap["private_key"]
+	assert.True(t, privateKeyPropExists)
+	assert.NotContains(t, ePrivateKeyJsonMap["private_key"], "BEGIN EC PRIVATE KEY")
+	assert.NotContains(t, ePrivateKeyJsonMap["private_key"], "END EC PRIVATE KEY")
+
+	_, kidPropExists := ePrivateKeyJsonMap["kid"]
+	assert.True(t, kidPropExists)
+
+	decryptedBytes, err := ejson.DecryptFile(ePrivateKeyJsonFilePath, "", privateKey)
+	assert.NoError(t, err)
+
+	var decryptedMap map[string]interface{}
+	err = json.Unmarshal(decryptedBytes, &decryptedMap)
+	assert.NoError(t, err)
+
+	assert.Contains(t, decryptedMap["private_key"], "BEGIN EC PRIVATE KEY")
+	assert.Contains(t, decryptedMap["private_key"], "END EC PRIVATE KEY")
 }
 
-const servicesYaml = `services:
+func TestWriteServiceSelectivePatchYamlFile(t *testing.T) {
+	publicKey, _, err := ejson.GenerateKeypair()
+	tmpManifestsRootDir, err := setupTests(t, "TestWriteServiceSelectivePatchYamlFile-", publicKey)
+	if err == nil {
+		defer func() {
+			err := os.RemoveAll(tmpManifestsRootDir)
+			if err != nil {
+				fmt.Printf("Error deleting test tmp directory: %v\n", err)
+			}
+		}()
+	}
+	assert.NoError(t, err)
+
+	cr := &config.CRConfig{
+		ManifestsRoot: tmpManifestsRootDir,
+	}
+
+	service := &serviceT{
+		Name: "foo",
+	}
+
+	err = os.Mkdir(filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/foo"), 0777)
+	assert.NoError(t, err)
+
+	err = writeServiceSelectivePatchYamlFile(cr, service)
+	assert.NoError(t, err)
+
+	verifyServiceSelectivePatchYamlFile(t, tmpManifestsRootDir, service.Name)
+}
+
+func verifyServiceSelectivePatchYamlFile(t *testing.T, tmpManifestsRootDir string, serviceName string) {
+	selectivePatchYamlFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, fmt.Sprintf("secrets/%v/selectivepatch.yaml", serviceName))
+	selectivePatchYamlFileBytes, err := ioutil.ReadFile(selectivePatchYamlFilePath)
+	assert.NoError(t, err)
+
+	var selectivePatchYamlMap map[string]interface{}
+	err = yaml.Unmarshal(selectivePatchYamlFileBytes, &selectivePatchYamlMap)
+	assert.NoError(t, err)
+	assert.Equal(t, fmt.Sprintf("%v-component-secrets-operator", serviceName), selectivePatchYamlMap["metadata"].(map[interface{}]interface{})["name"])
+
+	var patchYamlMap map[string]interface{}
+	err = yaml.Unmarshal([]byte(selectivePatchYamlMap["patches"].([]interface{})[0].(map[interface{}]interface{})["patch"].(string)), &patchYamlMap)
+	assert.NoError(t, err)
+	assert.Equal(t, fmt.Sprintf("%v-secrets", serviceName), patchYamlMap["metadata"].(map[interface{}]interface{})["name"])
+}
+
+func TestGenerateKeys(t *testing.T) {
+	publicKey, privateKey, err := ejson.GenerateKeypair()
+	tmpManifestsRootDir, err := setupTests(t, "TestGenerateKeys-", publicKey)
+	if err == nil {
+		defer func() {
+			err := os.RemoveAll(tmpManifestsRootDir)
+			if err != nil {
+				fmt.Printf("Error deleting test tmp directory: %v\n", err)
+			}
+		}()
+	}
+	assert.NoError(t, err)
+
+	cr := &config.CRConfig{
+		ManifestsRoot: tmpManifestsRootDir,
+	}
+
+	err = GenerateKeys(cr)
+	assert.NoError(t, err)
+
+	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "foo", privateKey)
+	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "bar", privateKey)
+
+	verifyServiceSelectivePatchYamlFile(t, tmpManifestsRootDir, "foo")
+	verifyServiceSelectivePatchYamlFile(t, tmpManifestsRootDir, "bar")
+
+	keysConfigsKustomizationFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/kustomization.yaml")
+	keysConfigsKustomizationFileBytes, err := ioutil.ReadFile(keysConfigsKustomizationFilePath)
+	assert.NoError(t, err)
+	assert.Equal(t, keysConfigs_kustomizationYaml, string(keysConfigsKustomizationFileBytes))
+
+	keysConfigsGomplateFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/gomplate.yaml")
+	keysConfigsGomplateFileBytes, err := ioutil.ReadFile(keysConfigsGomplateFilePath)
+	assert.NoError(t, err)
+	assert.Equal(t, keysConfigs_gomplateYaml, string(keysConfigsGomplateFileBytes))
+
+	keysConfigsSelectivePatchYamlFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/selectivepatch.yaml")
+	keysConfigsSelectivePatchYamlFileBytes, err := ioutil.ReadFile(keysConfigsSelectivePatchYamlFilePath)
+	assert.NoError(t, err)
+
+	var selectivePatchYamlMap map[string]interface{}
+	err = yaml.Unmarshal(keysConfigsSelectivePatchYamlFileBytes, &selectivePatchYamlMap)
+	assert.NoError(t, err)
+
+	var patchYamlMap map[string]interface{}
+	err = yaml.Unmarshal([]byte(selectivePatchYamlMap["patches"].([]interface{})[0].(map[interface{}]interface{})["patch"].(string)), &patchYamlMap)
+	assert.NoError(t, err)
+
+	assert.Equal(t, `(( (ds "data").foo ))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-foo"])
+	assert.Equal(t, `(( (ds "data").bar ))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-bar"])
+
+	eJwksJsonFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/ejwks.json")
+	eJwksJsonFileBytes, err := ioutil.ReadFile(eJwksJsonFilePath)
+	assert.NoError(t, err)
+
+	var eJwksJsonMap map[string]interface{}
+	err = json.Unmarshal(eJwksJsonFileBytes, &eJwksJsonMap)
+	assert.NoError(t, err)
+
+	_, fooPropExists := eJwksJsonMap["foo"]
+	assert.True(t, fooPropExists)
+	assert.NotContains(t, eJwksJsonMap["foo"], "BEGIN PUBLIC KEY")
+	assert.NotContains(t, eJwksJsonMap["foo"], "END PUBLIC KEY")
+
+	_, barPropExists := eJwksJsonMap["bar"]
+	assert.True(t, barPropExists)
+	assert.NotContains(t, eJwksJsonMap["bar"], "BEGIN PUBLIC KEY")
+	assert.NotContains(t, eJwksJsonMap["bar"], "END PUBLIC KEY")
+
+	decryptedBytes, err := ejson.DecryptFile(eJwksJsonFilePath, "", privateKey)
+	assert.NoError(t, err)
+
+	var decryptedMap map[string]interface{}
+	err = json.Unmarshal(decryptedBytes, &decryptedMap)
+	assert.NoError(t, err)
+
+	assert.Contains(t, decryptedMap["foo"], "BEGIN PUBLIC KEY")
+	assert.Contains(t, decryptedMap["foo"], "END PUBLIC KEY")
+
+	assert.Contains(t, decryptedMap["bar"], "BEGIN PUBLIC KEY")
+	assert.Contains(t, decryptedMap["bar"], "END PUBLIC KEY")
+}
+
+const servicesYaml = `
 - name: foo
 - name: bar
 `
 
 const serviceSecrets_ePrivateKeyJsonTmpl = `{
-  "_public_key": "04eb6c4c0b7ffec7a02a9c36919a36f94f45b90d0850ce79f559bf09a6782278",
+  "_public_key": "%v",
   "private_key": "{{.PrivateKey}}",
   "kid": "{{.Kid}}"
 }
@@ -132,9 +280,8 @@ patches:
 `
 
 const keysConfigs_ejwksJsonTmpl = `{
-  "_public_key": "04eb6c4c0b7ffec7a02a9c36919a36f94f45b90d0850ce79f559bf09a6782278"
-  {{range .services}}
-  ,"{{.Name}}": "{{.JWKS}}"
+  "_public_key": "%v"
+  {{range .}},"{{.Name}}": "{{.JWKS}}"
   {{end}}
 }
 `
@@ -160,7 +307,7 @@ transformers:
   - gomplate.yaml
 `
 
-const keysConfigs_selectivepatchYaml = `
+const keysConfigs_selectivepatchYamlTmpl = `
 apiVersion: qlik.com/v1
 kind: SelectivePatch
 metadata:
@@ -176,13 +323,12 @@ patches:
       metadata:
         name: keys-configs
       data:
-        {{range .services}}
-        qlik.api.internal-{{.Name}}: (( (ds "data").{{.Name}} ))
+        {{range .}}qlik.api.internal-{{.Name}}: (( (ds "data").{{.Name}} ))
         {{end}}
 `
 
-func setupTmpManifestsRootDir(t *testing.T, prefix string) (string, error) {
-	tmpDir, err := ioutil.TempDir("", prefix)
+func setupTests(t *testing.T, tmpDirPrefix string, publicKey string) (tmpDir string, err error) {
+	tmpDir, err = ioutil.TempDir("", tmpDirPrefix)
 	if err != nil {
 		return "", err
 	}
@@ -197,20 +343,23 @@ func setupTmpManifestsRootDir(t *testing.T, prefix string) (string, error) {
 	if err := os.MkdirAll(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs"), 0777); err != nil {
 		return "", err
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/ejwks.json.tmpl"), []byte(keysConfigs_ejwksJsonTmpl), 0777); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/ejwks.json.tmpl"), []byte(fmt.Sprintf(keysConfigs_ejwksJsonTmpl, publicKey)), 0777); err != nil {
 		return "", err
 	}
 	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/gomplate.yaml"), []byte(keysConfigs_gomplateYaml), 0777); err != nil {
 		return "", err
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/selectivepatch.yaml"), []byte(keysConfigs_selectivepatchYaml), 0777); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/kustomization.yaml"), []byte(keysConfigs_kustomizationYaml), 0777); err != nil {
+		return "", err
+	}
+	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/selectivepatch.yaml.tmpl"), []byte(keysConfigs_selectivepatchYamlTmpl), 0777); err != nil {
 		return "", err
 	}
 
 	if err := os.MkdirAll(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets"), 0777); err != nil {
 		return "", err
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets/eprivate_key.json.tmpl"), []byte(serviceSecrets_ePrivateKeyJsonTmpl), 0777); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets/eprivate_key.json.tmpl"), []byte(fmt.Sprintf(serviceSecrets_ePrivateKeyJsonTmpl, publicKey)), 0777); err != nil {
 		return "", err
 	}
 	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets/kustomization.yaml"), []byte(serviceSecrets_kustomizationYaml), 0777); err != nil {
@@ -220,7 +369,7 @@ func setupTmpManifestsRootDir(t *testing.T, prefix string) (string, error) {
 		return "", err
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/services.yaml"), []byte(servicesYaml), 0777); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/services.yaml"), []byte(servicesYaml), 0777); err != nil {
 		return "", err
 	}
 
