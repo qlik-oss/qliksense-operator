@@ -25,4 +25,8 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	qust.ProcessCrConfigs(cr)
 	// Process cr.secrets
 	qust.ProcessCrSecrets(cr)
+
+	if cr.GenerateKeys {
+		_ = qust.GenerateKeys(cr)
+	}
 }

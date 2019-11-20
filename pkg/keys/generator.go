@@ -13,7 +13,7 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
-type jsonWebKeySetType struct {
+type jsonWebKeySetT struct {
 	Keys []map[string]interface{} `json:"keys"`
 }
 
@@ -72,7 +72,7 @@ func getJwks(publicKey *ecdsa.PublicKey, keyId string) (string, error) {
 
 	publicJSONWebKeyJsonMap["pem"] = publicKeyPem
 
-	jsonWebKeySet := jsonWebKeySetType{
+	jsonWebKeySet := jsonWebKeySetT{
 		Keys: []map[string]interface{}{publicJSONWebKeyJsonMap},
 	}
 
