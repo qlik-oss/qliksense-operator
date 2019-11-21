@@ -156,65 +156,31 @@ func verifyServiceSelectivePatchYamlFile(t *testing.T, tmpManifestsRootDir strin
 	assert.Equal(t, fmt.Sprintf("%v-secrets", serviceName), patchYamlMap["metadata"].(map[interface{}]interface{})["name"])
 }
 
-func TestGenerateKeys_noPreviousPatches(t *testing.T) {
-	publicKey, privateKey, err := ejson.GenerateKeypair()
-	tmpManifestsRootDir, err := setupTests(t, "TestGenerateKeys-", publicKey)
-	if err == nil {
-		defer func() {
-			err := os.RemoveAll(tmpManifestsRootDir)
-			if err != nil {
-				fmt.Printf("Error deleting test tmp directory: %v\n", err)
-			}
-		}()
-	}
-	assert.NoError(t, err)
-
-	secretsKustomizationYaml := `
+func TestGenerateKeys(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		secretsKustomizationYaml string
+		configsKustomizationYaml string
+	}{
+		{
+			name: "noPreviousPatches",
+			secretsKustomizationYaml: `
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - qliksense.yaml
 transformers:
 - ../../transformers
-`
-	secretsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/kustomization.yaml")
-	err = ioutil.WriteFile(secretsKustomizationYamlPath, []byte(secretsKustomizationYaml), 0777)
-	assert.NoError(t, err)
-
-	configsKustomizationYaml := `
+`,
+			configsKustomizationYaml: `
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-`
-	configsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/kustomization.yaml")
-	err = ioutil.WriteFile(configsKustomizationYamlPath, []byte(configsKustomizationYaml), 0777)
-	assert.NoError(t, err)
-
-	cr := &config.CRConfig{
-		ManifestsRoot: tmpManifestsRootDir,
-	}
-
-	err = GenerateKeys(cr)
-	assert.NoError(t, err)
-
-	verifyServicePatches(t, tmpManifestsRootDir, privateKey)
-	verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
-}
-
-func TestGenerateKeys_withPreviousPatches(t *testing.T) {
-	publicKey, privateKey, err := ejson.GenerateKeypair()
-	tmpManifestsRootDir, err := setupTests(t, "TestGenerateKeys-", publicKey)
-	if err == nil {
-		defer func() {
-			err := os.RemoveAll(tmpManifestsRootDir)
-			if err != nil {
-				fmt.Printf("Error deleting test tmp directory: %v\n", err)
-			}
-		}()
-	}
-	assert.NoError(t, err)
-
-	secretsKustomizationYaml := `
+`,
+		},
+		{
+			name: "withPreviousPatches",
+			secretsKustomizationYaml: `
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -223,46 +189,17 @@ resources:
 - bar
 transformers:
 - ../../transformers
-`
-	secretsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/kustomization.yaml")
-	err = ioutil.WriteFile(secretsKustomizationYamlPath, []byte(secretsKustomizationYaml), 0777)
-	assert.NoError(t, err)
-
-	configsKustomizationYaml := `
+`,
+			configsKustomizationYaml: `
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - keys
-`
-	configsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/kustomization.yaml")
-	err = ioutil.WriteFile(configsKustomizationYamlPath, []byte(configsKustomizationYaml), 0777)
-	assert.NoError(t, err)
-
-	cr := &config.CRConfig{
-		ManifestsRoot: tmpManifestsRootDir,
-	}
-
-	err = GenerateKeys(cr)
-	assert.NoError(t, err)
-
-	verifyServicePatches(t, tmpManifestsRootDir, privateKey)
-	verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
-}
-
-func TestGenerateKeys_withSomePreviousPatches(t *testing.T) {
-	publicKey, privateKey, err := ejson.GenerateKeypair()
-	tmpManifestsRootDir, err := setupTests(t, "TestGenerateKeys-", publicKey)
-	if err == nil {
-		defer func() {
-			err := os.RemoveAll(tmpManifestsRootDir)
-			if err != nil {
-				fmt.Printf("Error deleting test tmp directory: %v\n", err)
-			}
-		}()
-	}
-	assert.NoError(t, err)
-
-	secretsKustomizationYaml := `
+`,
+		},
+		{
+			name: "withSomePreviousPatches",
+			secretsKustomizationYaml: `
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -271,30 +208,48 @@ resources:
 - bar
 transformers:
 - ../../transformers
-`
-	secretsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/kustomization.yaml")
-	err = ioutil.WriteFile(secretsKustomizationYamlPath, []byte(secretsKustomizationYaml), 0777)
-	assert.NoError(t, err)
-
-	configsKustomizationYaml := `
+`,
+			configsKustomizationYaml: `
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - abra-cadabra
-`
-	configsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/kustomization.yaml")
-	err = ioutil.WriteFile(configsKustomizationYamlPath, []byte(configsKustomizationYaml), 0777)
-	assert.NoError(t, err)
-
-	cr := &config.CRConfig{
-		ManifestsRoot: tmpManifestsRootDir,
+`,
+		},
 	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			publicKey, privateKey, err := ejson.GenerateKeypair()
+			tmpManifestsRootDir, err := setupTests(t, fmt.Sprintf("TestGenerateKeys-%v-", testCase.name), publicKey)
+			if err == nil {
+				defer func() {
+					err := os.RemoveAll(tmpManifestsRootDir)
+					if err != nil {
+						fmt.Printf("Error deleting test tmp directory: %v\n", err)
+					}
+				}()
+			}
+			assert.NoError(t, err)
 
-	err = GenerateKeys(cr)
-	assert.NoError(t, err)
+			secretsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/kustomization.yaml")
+			err = ioutil.WriteFile(secretsKustomizationYamlPath, []byte(testCase.secretsKustomizationYaml), 0777)
+			assert.NoError(t, err)
 
-	verifyServicePatches(t, tmpManifestsRootDir, privateKey)
-	verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
+			configsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/kustomization.yaml")
+			err = ioutil.WriteFile(configsKustomizationYamlPath, []byte(testCase.configsKustomizationYaml), 0777)
+			assert.NoError(t, err)
+
+			cr := &config.CRConfig{
+				ManifestsRoot: tmpManifestsRootDir,
+			}
+
+			err = GenerateKeys(cr)
+			assert.NoError(t, err)
+
+			verifyServicePatches(t, tmpManifestsRootDir, privateKey)
+			verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
+		})
+	}
 }
 
 func verifySecretsAndConfigsKustomizationFiles(t *testing.T, secretsKustomizationYamlPath string, configsKustomizationYamlPath string) {
