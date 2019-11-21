@@ -43,6 +43,13 @@ func GenerateKeys(cr *config.CRConfig) error {
 	if err := writeKeysConfigs(cr, serviceList); err != nil {
 		return err
 	}
+	if err := overrideSecretsKustomizationYaml(cr, serviceList); err != nil {
+		return err
+	}
+	if err := overrideConfigsKustomizationYaml(cr); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -88,6 +95,74 @@ func writeKeysConfigs(cr *config.CRConfig, serviceList []*serviceT) error {
 	return nil
 }
 
+func overrideSecretsKustomizationYaml(cr *config.CRConfig, services []*serviceT) error {
+	kustomizationYamlPath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets/kustomization.yaml")
+	return smallFileCopy(kustomizationYamlPath, kustomizationYamlPath, 0777, func(in []byte)([]byte, error) {
+		var yamlMap map[string]interface{}
+		if err := yaml.Unmarshal(in, &yamlMap); err != nil {
+			return nil, err
+		}
+
+		presentResources := make([]interface{}, 0)
+		if yamlMap["resources"] != nil {
+			presentResources = yamlMap["resources"].([]interface{})
+		}
+
+		presentResourcesMap := make(map[string]bool)
+		for _, resource := range presentResources {
+			presentResourcesMap[resource.(string)] = true
+		}
+
+		for _, service := range services {
+			if _, ok := presentResourcesMap[service.Name]; !ok {
+				presentResources = append(presentResources, service.Name)
+			}
+		}
+
+		yamlMap["resources"] = presentResources
+		out, err := yaml.Marshal(&yamlMap)
+		if err != nil {
+			return nil, err
+		}
+
+		return out, nil
+	})
+}
+
+func overrideConfigsKustomizationYaml(cr *config.CRConfig) error {
+	kustomizationYamlPath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/kustomization.yaml")
+	return smallFileCopy(kustomizationYamlPath, kustomizationYamlPath, 0777, func(in []byte)([]byte, error) {
+		var yamlMap map[string]interface{}
+		if err := yaml.Unmarshal(in, &yamlMap); err != nil {
+			return nil, err
+		}
+
+		presentResources := make([]interface{}, 0)
+		if yamlMap["resources"] != nil {
+			presentResources = yamlMap["resources"].([]interface{})
+		}
+
+		foundKeysResource := false
+		for _, resource := range presentResources {
+			if resource.(string) == "keys" {
+				foundKeysResource = true
+				break
+			}
+		}
+		if !foundKeysResource {
+			presentResources = append(presentResources, "keys")
+		}
+
+		yamlMap["resources"] = presentResources
+		out, err := yaml.Marshal(&yamlMap)
+		if err != nil {
+			return nil, err
+		}
+
+		return out, nil
+	})
+}
+
 func setupServiceSecretsDirectory(cr *config.CRConfig, service *serviceT) error {
 	serviceSecretsDirPath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets", service.Name)
 	if err := os.RemoveAll(serviceSecretsDirPath); err != nil {
@@ -98,7 +173,7 @@ func setupServiceSecretsDirectory(cr *config.CRConfig, service *serviceT) error 
 	}
 	if err := smallFileCopy(
 		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "templates/keys/service_secrets/kustomization.yaml"),
-		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets", service.Name, "kustomization.yaml"), 0777); err != nil {
+		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets", service.Name, "kustomization.yaml"), 0777, nil); err != nil {
 		return err
 	}
 	return nil
@@ -143,12 +218,12 @@ func setupKeysConfigsDirectory(cr *config.CRConfig) error {
 	}
 	if err := smallFileCopy(
 		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "templates/keys/keys_configs/kustomization.yaml"),
-		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/keys/kustomization.yaml"), 0777); err != nil {
+		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/keys/kustomization.yaml"), 0777, nil); err != nil {
 		return err
 	}
 	if err := smallFileCopy(
 		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "templates/keys/keys_configs/gomplate.yaml"),
-		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/keys/gomplate.yaml"), 0777); err != nil {
+		filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/keys/gomplate.yaml"), 0777, nil); err != nil {
 		return err
 	}
 	return nil
@@ -183,10 +258,16 @@ func writeKeysSelectivePatchYamlFile(cr *config.CRConfig, services []*serviceT) 
 	return nil
 }
 
-func smallFileCopy(srcPath string, dstPath string, perm os.FileMode) error {
+func smallFileCopy(srcPath string, dstPath string, perm os.FileMode, transform func([]byte)([]byte, error)) error {
 	bytes, err := ioutil.ReadFile(srcPath)
 	if err != nil {
 		return err
+	}
+	if transform != nil {
+		bytes, err  = transform(bytes)
+		if err != nil {
+			return err
+		}
 	}
 	err = ioutil.WriteFile(dstPath, bytes, perm)
 	if err != nil {

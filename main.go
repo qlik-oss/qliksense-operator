@@ -27,6 +27,6 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	qust.ProcessCrSecrets(cr)
 
 	if cr.GenerateKeys {
-		_ = qust.GenerateKeys(cr)
+		err = qust.GenerateKeys(cr)
 	}
 }

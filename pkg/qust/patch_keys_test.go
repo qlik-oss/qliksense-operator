@@ -156,7 +156,7 @@ func verifyServiceSelectivePatchYamlFile(t *testing.T, tmpManifestsRootDir strin
 	assert.Equal(t, fmt.Sprintf("%v-secrets", serviceName), patchYamlMap["metadata"].(map[interface{}]interface{})["name"])
 }
 
-func TestGenerateKeys(t *testing.T) {
+func TestGenerateKeys_noPreviousPatches(t *testing.T) {
 	publicKey, privateKey, err := ejson.GenerateKeypair()
 	tmpManifestsRootDir, err := setupTests(t, "TestGenerateKeys-", publicKey)
 	if err == nil {
@@ -169,6 +169,27 @@ func TestGenerateKeys(t *testing.T) {
 	}
 	assert.NoError(t, err)
 
+	secretsKustomizationYaml := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- qliksense.yaml
+transformers:
+- ../../transformers
+`
+	secretsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/kustomization.yaml")
+	err = ioutil.WriteFile(secretsKustomizationYamlPath, []byte(secretsKustomizationYaml), 0777)
+	assert.NoError(t, err)
+
+	configsKustomizationYaml := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+`
+	configsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/kustomization.yaml")
+	err = ioutil.WriteFile(configsKustomizationYamlPath, []byte(configsKustomizationYaml), 0777)
+	assert.NoError(t, err)
+
 	cr := &config.CRConfig{
 		ManifestsRoot: tmpManifestsRootDir,
 	}
@@ -176,6 +197,128 @@ func TestGenerateKeys(t *testing.T) {
 	err = GenerateKeys(cr)
 	assert.NoError(t, err)
 
+	verifyServicePatches(t, tmpManifestsRootDir, privateKey)
+	verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
+}
+
+func TestGenerateKeys_withPreviousPatches(t *testing.T) {
+	publicKey, privateKey, err := ejson.GenerateKeypair()
+	tmpManifestsRootDir, err := setupTests(t, "TestGenerateKeys-", publicKey)
+	if err == nil {
+		defer func() {
+			err := os.RemoveAll(tmpManifestsRootDir)
+			if err != nil {
+				fmt.Printf("Error deleting test tmp directory: %v\n", err)
+			}
+		}()
+	}
+	assert.NoError(t, err)
+
+	secretsKustomizationYaml := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- qliksense.yaml
+- foo
+- bar
+transformers:
+- ../../transformers
+`
+	secretsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/kustomization.yaml")
+	err = ioutil.WriteFile(secretsKustomizationYamlPath, []byte(secretsKustomizationYaml), 0777)
+	assert.NoError(t, err)
+
+	configsKustomizationYaml := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- keys
+`
+	configsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/kustomization.yaml")
+	err = ioutil.WriteFile(configsKustomizationYamlPath, []byte(configsKustomizationYaml), 0777)
+	assert.NoError(t, err)
+
+	cr := &config.CRConfig{
+		ManifestsRoot: tmpManifestsRootDir,
+	}
+
+	err = GenerateKeys(cr)
+	assert.NoError(t, err)
+
+	verifyServicePatches(t, tmpManifestsRootDir, privateKey)
+	verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
+}
+
+func TestGenerateKeys_withSomePreviousPatches(t *testing.T) {
+	publicKey, privateKey, err := ejson.GenerateKeypair()
+	tmpManifestsRootDir, err := setupTests(t, "TestGenerateKeys-", publicKey)
+	if err == nil {
+		defer func() {
+			err := os.RemoveAll(tmpManifestsRootDir)
+			if err != nil {
+				fmt.Printf("Error deleting test tmp directory: %v\n", err)
+			}
+		}()
+	}
+	assert.NoError(t, err)
+
+	secretsKustomizationYaml := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- qliksense.yaml
+#- foo
+- bar
+transformers:
+- ../../transformers
+`
+	secretsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "secrets/kustomization.yaml")
+	err = ioutil.WriteFile(secretsKustomizationYamlPath, []byte(secretsKustomizationYaml), 0777)
+	assert.NoError(t, err)
+
+	configsKustomizationYaml := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- abra-cadabra
+`
+	configsKustomizationYamlPath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/kustomization.yaml")
+	err = ioutil.WriteFile(configsKustomizationYamlPath, []byte(configsKustomizationYaml), 0777)
+	assert.NoError(t, err)
+
+	cr := &config.CRConfig{
+		ManifestsRoot: tmpManifestsRootDir,
+	}
+
+	err = GenerateKeys(cr)
+	assert.NoError(t, err)
+
+	verifyServicePatches(t, tmpManifestsRootDir, privateKey)
+	verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
+}
+
+func verifySecretsAndConfigsKustomizationFiles(t *testing.T, secretsKustomizationYamlPath string, configsKustomizationYamlPath string) {
+	secretsKustomizationYamlFinalBytes, err := ioutil.ReadFile(secretsKustomizationYamlPath)
+	assert.NoError(t, err)
+
+	var secretsKustomizationYamlMap map[string]interface{}
+	err = yaml.Unmarshal(secretsKustomizationYamlFinalBytes, &secretsKustomizationYamlMap)
+	assert.NoError(t, err)
+
+	assert.Contains(t, secretsKustomizationYamlMap["resources"].([]interface{}), "foo")
+	assert.Contains(t, secretsKustomizationYamlMap["resources"].([]interface{}), "bar")
+
+	configsKustomizationYamlFinalBytes, err := ioutil.ReadFile(configsKustomizationYamlPath)
+	assert.NoError(t, err)
+
+	var configsKustomizationYamlMap map[string]interface{}
+	err = yaml.Unmarshal(configsKustomizationYamlFinalBytes, &configsKustomizationYamlMap)
+	assert.NoError(t, err)
+
+	assert.Contains(t, configsKustomizationYamlMap["resources"].([]interface{}), "keys")
+}
+
+func verifyServicePatches(t *testing.T, tmpManifestsRootDir string, privateKey string) {
 	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "foo", privateKey)
 	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "bar", privateKey)
 
@@ -203,7 +346,6 @@ func TestGenerateKeys(t *testing.T) {
 	var patchYamlMap map[string]interface{}
 	err = yaml.Unmarshal([]byte(selectivePatchYamlMap["patches"].([]interface{})[0].(map[interface{}]interface{})["patch"].(string)), &patchYamlMap)
 	assert.NoError(t, err)
-
 	assert.Equal(t, `(( (ds "data").foo ))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-foo"])
 	assert.Equal(t, `(( (ds "data").bar ))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-bar"])
 
@@ -214,12 +356,10 @@ func TestGenerateKeys(t *testing.T) {
 	var eJwksJsonMap map[string]interface{}
 	err = json.Unmarshal(eJwksJsonFileBytes, &eJwksJsonMap)
 	assert.NoError(t, err)
-
 	_, fooPropExists := eJwksJsonMap["foo"]
 	assert.True(t, fooPropExists)
 	assert.NotContains(t, eJwksJsonMap["foo"], "BEGIN PUBLIC KEY")
 	assert.NotContains(t, eJwksJsonMap["foo"], "END PUBLIC KEY")
-
 	_, barPropExists := eJwksJsonMap["bar"]
 	assert.True(t, barPropExists)
 	assert.NotContains(t, eJwksJsonMap["bar"], "BEGIN PUBLIC KEY")
@@ -227,14 +367,11 @@ func TestGenerateKeys(t *testing.T) {
 
 	decryptedBytes, err := ejson.DecryptFile(eJwksJsonFilePath, "", privateKey)
 	assert.NoError(t, err)
-
 	var decryptedMap map[string]interface{}
 	err = json.Unmarshal(decryptedBytes, &decryptedMap)
 	assert.NoError(t, err)
-
 	assert.Contains(t, decryptedMap["foo"], "BEGIN PUBLIC KEY")
 	assert.Contains(t, decryptedMap["foo"], "END PUBLIC KEY")
-
 	assert.Contains(t, decryptedMap["bar"], "BEGIN PUBLIC KEY")
 	assert.Contains(t, decryptedMap["bar"], "END PUBLIC KEY")
 }
