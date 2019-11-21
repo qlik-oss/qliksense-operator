@@ -97,7 +97,7 @@ func writeKeysConfigs(cr *config.CRConfig, serviceList []*serviceT) error {
 
 func overrideSecretsKustomizationYaml(cr *config.CRConfig, services []*serviceT) error {
 	kustomizationYamlPath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets/kustomization.yaml")
-	return smallFileCopy(kustomizationYamlPath, kustomizationYamlPath, 0777, func(in []byte)([]byte, error) {
+	return smallFileCopy(kustomizationYamlPath, kustomizationYamlPath, 0777, func(in []byte) ([]byte, error) {
 		var yamlMap map[string]interface{}
 		if err := yaml.Unmarshal(in, &yamlMap); err != nil {
 			return nil, err
@@ -131,7 +131,7 @@ func overrideSecretsKustomizationYaml(cr *config.CRConfig, services []*serviceT)
 
 func overrideConfigsKustomizationYaml(cr *config.CRConfig) error {
 	kustomizationYamlPath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/kustomization.yaml")
-	return smallFileCopy(kustomizationYamlPath, kustomizationYamlPath, 0777, func(in []byte)([]byte, error) {
+	return smallFileCopy(kustomizationYamlPath, kustomizationYamlPath, 0777, func(in []byte) ([]byte, error) {
 		var yamlMap map[string]interface{}
 		if err := yaml.Unmarshal(in, &yamlMap); err != nil {
 			return nil, err
@@ -258,13 +258,13 @@ func writeKeysSelectivePatchYamlFile(cr *config.CRConfig, services []*serviceT) 
 	return nil
 }
 
-func smallFileCopy(srcPath string, dstPath string, perm os.FileMode, transform func([]byte)([]byte, error)) error {
+func smallFileCopy(srcPath string, dstPath string, perm os.FileMode, transform func([]byte) ([]byte, error)) error {
 	bytes, err := ioutil.ReadFile(srcPath)
 	if err != nil {
 		return err
 	}
 	if transform != nil {
-		bytes, err  = transform(bytes)
+		bytes, err = transform(bytes)
 		if err != nil {
 			return err
 		}

@@ -3,13 +3,13 @@ package qust
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Shopify/ejson"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/Shopify/ejson"
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/keys"
 	"github.com/stretchr/testify/assert"

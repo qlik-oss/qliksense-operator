@@ -1,9 +1,10 @@
 package main
 
 import (
+	"log"
+
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/qust"
-	"log"
 )
 
 func main() {
