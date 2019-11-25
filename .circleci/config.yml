@@ -23,9 +23,9 @@ jobs:
           command: |
             go get github.com/tcnksm/ghr
             # VERSION=v$(./artifacts/qliksense-linux-amd64 version | sed -nre 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
-            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} /go/src/github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/bin/qliksense-operator/${CIRCLE_TAG}/
+            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} /go/src/github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/bin/qliksense-operator/
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
-      - run: make docker-push 
+      - run: make docker-push
 workflows:
   version: 2
   commit:
@@ -47,6 +47,6 @@ workflows:
             - build
           filters:
             branches:
-              ignore: /.*/ 
+              ignore: /.*/
             tags:
               only: /v.*/
