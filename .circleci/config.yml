@@ -1,54 +1,63 @@
 
+version: 2.1
+orbs:
+  docker-publish: circleci/docker-publish@0.1.7
+workflows:
+  build_and_publish_docker_image:
+    jobs:
+      - docker-publish/publish:
+          image: qlik/cnab-qliksense-base
+          tag: latest
 # Golang CircleCI 2.0 configuration file
 #
 # Check https://circleci.com/docs/2.0/language-go/ for more details
-version: 2
-jobs:
-  build:
-    docker:
-      - image: circleci/golang:stretch
-    working_directory: /go/src/github.com/qlik-oss/qliksense-operator
-    steps:
-      - checkout
-      - run: make build
-  build_release:
-    docker:
-      - image: circleci/golang:stretch
-    working_directory: /go/src/github.com/qlik-oss/qliksense-operator
-    steps:
-      - checkout
-      - run: make build-client
-      # - run:
-      #     name: "Publish Release on GitHub"
-      #     command: |
-      #       go get github.com/tcnksm/ghr
-      #       # VERSION=v$(./artifacts/qliksense-linux-amd64 version | sed -nre 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
-      #       ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} /go/src/github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/bin/qliksense-operator/
-      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
-      - run: make docker-push
-workflows:
-  version: 2
-  commit:
-    jobs:
-      - build:
-          filters:
-            branches:
-              only: master
-  build_release:
-    jobs:
-      - build:
-          filters:
-            branches:
-              # ignore: /.*/
-              only: master
-            # tags:
-            #   only: /v.*/
-      - build_release:
-          requires:
-            - build
-          filters:
-            branches:
-              #ignore: /.*/
-              only: master
-            # tags:
-            #   only: /v.*/
+# version: 2
+# jobs:
+#   build:
+#     docker:
+#       - image: circleci/golang:stretch
+#     working_directory: /go/src/github.com/qlik-oss/qliksense-operator
+#     steps:
+#       - checkout
+#       - run: make build
+#   build_release:
+#     docker:
+#       - image: circleci/golang:stretch
+#     working_directory: /go/src/github.com/qlik-oss/qliksense-operator
+#     steps:
+#       - checkout
+#       - run: make build-client
+#       # - run:
+#       #     name: "Publish Release on GitHub"
+#       #     command: |
+#       #       go get github.com/tcnksm/ghr
+#       #       # VERSION=v$(./artifacts/qliksense-linux-amd64 version | sed -nre 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
+#       #       ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} /go/src/github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/bin/qliksense-operator/
+#       - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+#       - run: make docker-push
+# workflows:
+#   version: 2
+#   commit:
+#     jobs:
+#       - build:
+#           filters:
+#             branches:
+#               only: master
+#   build_release:
+#     jobs:
+#       - build:
+#           filters:
+#             branches:
+#               # ignore: /.*/
+#               only: master
+#             # tags:
+#             #   only: /v.*/
+#       - build_release:
+#           requires:
+#             - build
+#           filters:
+#             branches:
+#               #ignore: /.*/
+#               only: master
+#             # tags:
+#             #   only: /v.*/
