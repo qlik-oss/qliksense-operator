@@ -39,9 +39,10 @@ workflows:
       - build:
           filters:
             branches:
-              ignore: /.*/
-            tags:
-              only: /v.*/
+              # ignore: /.*/
+              only: master
+            # tags:
+            #   only: /v.*/
       - build_release:
           requires:
             - build
