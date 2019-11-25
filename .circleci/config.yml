@@ -6,7 +6,7 @@ workflows:
   build_and_publish_docker_image:
     jobs:
       - docker-publish/publish:
-          image: qlik/cnab-qliksense-base
+          image: qlik/qliksense-operator
           tag: latest
 # Golang CircleCI 2.0 configuration file
 #
