@@ -14,6 +14,7 @@ type CRConfig struct {
 	Secrets       []Secret `json:"secrets,omitempty" yaml:"secrets,omitempty"`
 	Configs       []Config `json:"configs,omitempty" yaml:"configs,omitempty"`
 	ManifestsRoot string   `json:"manifestsRoot,omitempty" yaml:"manifestsRoot,omitempty"`
+	GenerateKeys  bool     `json:"generateKeys,omitempty" yaml:"generateKeys,omitempty"`
 }
 type Secret struct {
 	SecretKey string            `json:"secretKey" yaml:"secretKey"`

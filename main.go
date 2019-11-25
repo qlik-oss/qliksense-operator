@@ -1,9 +1,10 @@
 package main
 
 import (
+	"log"
+
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/qust"
-	"log"
 )
 
 func main() {
@@ -25,4 +26,11 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	qust.ProcessCrConfigs(cr)
 	// Process cr.secrets
 	qust.ProcessCrSecrets(cr)
+
+	if cr.GenerateKeys {
+		err := qust.GenerateKeys(cr)
+		if err != nil {
+			log.Printf("error generating keys: %v\n", err)
+		}
+	}
 }
