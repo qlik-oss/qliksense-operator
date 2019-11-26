@@ -10,8 +10,11 @@ import (
 )
 
 func ProcessCrSecrets(cr *config.CRConfig) {
-	pm := createSupperSecretSelectivePatch(cr.Secrets)
 	baseSecretDir := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets")
+	if _, err := os.Stat(baseSecretDir); os.IsNotExist(err) {
+		log.Panic(baseSecretDir + " does not exist ")
+	}
+	pm := createSupperSecretSelectivePatch(cr.Secrets)
 	for svc, sps := range pm {
 		fpath := filepath.Join(baseSecretDir, svc+".yaml")
 		fileHand, _ := os.Create(fpath)

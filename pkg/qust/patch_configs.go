@@ -10,8 +10,11 @@ import (
 )
 
 func ProcessCrConfigs(cr *config.CRConfig) {
-	pm := createSupperConfigSelectivePatch(cr.Configs)
 	baseConfigDir := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs")
+	if _, err := os.Stat(baseConfigDir); os.IsNotExist(err) {
+		log.Panic(baseConfigDir + " does not exist ")
+	}
+	pm := createSupperConfigSelectivePatch(cr.Configs)
 	for svc, sps := range pm {
 		fpath := filepath.Join(baseConfigDir, svc+".yaml")
 		fileHand, _ := os.Create(fpath)
