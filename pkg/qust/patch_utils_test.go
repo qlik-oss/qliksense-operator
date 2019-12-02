@@ -37,6 +37,7 @@ func setupCr(t *testing.T) io.Reader {
 	sampleConfig := `
 configProfile: manifests/base
 manifestsRoot: "."
+storageClassName: "efs"
 configs:
 - dataKey: acceptEULA
   values:
@@ -49,6 +50,8 @@ secrets:
 	return strings.NewReader(sampleConfig)
 }
 
+// it create manifest structure and return a td function to delete them latter
+// and the path to the root directory of manifests
 func createManifestsStructure(t *testing.T) (func(), string) {
 	/*
 		manifestsRoot
@@ -56,13 +59,19 @@ func createManifestsStructure(t *testing.T) (func(), string) {
 		   |--configs
 					|--kustomization.yaml
 			 |--secrets
-			    |--kustomization.yaml
+					|--kustomization.yaml
+			 |--transformers
+					|--kustomization.yaml
+					|--storage-class.yaml
 	*/
 	dir, _ := ioutil.TempDir("", "test_manifests")
 	oprCnfDir := filepath.Join(dir, ".operator", "configs")
 	oprSecDir := filepath.Join(dir, ".operator", "secrets")
+	oprTansDir := filepath.Join(dir, ".operator", "transformers")
 	os.MkdirAll(oprCnfDir, tempPermissionCode)
 	os.MkdirAll(oprSecDir, tempPermissionCode)
+	os.MkdirAll(oprTansDir, tempPermissionCode)
+
 	k := `
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -74,6 +83,42 @@ resources:`
 		os.Exit(1)
 	}
 	ioutil.WriteFile(filepath.Join(oprSecDir, "kustomization.yaml"), []byte(k), tempPermissionCode)
+	stk := `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- storage-class.yaml
+`
+	scf := `
+apiVersion: qlik.com/v1
+kind: SelectivePatch
+enabled: true
+patches:
+- target:
+		name: storageClassName
+		labelSelector: app=engine
+	patch: |-
+		- op: replace
+			path: /enabled
+			value: false
+- target:
+		name: storageClassName
+		labelSelector: app=qix-datafiles
+	patch: |-
+		- op: replace
+			path: /enabled
+			value: false`
+	err = ioutil.WriteFile(filepath.Join(oprTansDir, "kustomization.yaml"), []byte(stk), tempPermissionCode)
+	if err != nil {
+		t.Log(err)
+		os.Exit(1)
+	}
+	err = ioutil.WriteFile(filepath.Join(oprTansDir, "storage-class.yaml"), []byte(scf), tempPermissionCode)
+	if err != nil {
+		t.Log(err)
+		os.Exit(1)
+	}
+
 	tearDown := func() {
 		os.RemoveAll(dir)
 	}

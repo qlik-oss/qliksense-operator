@@ -27,6 +27,9 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	// Process cr.secrets
 	qust.ProcessCrSecrets(cr)
 
+	// process cr.storageClassName
+	qust.ProcessStorageClassName(cr)
+
 	if cr.GenerateKeys {
 		err := qust.GenerateKeys(cr)
 		if err != nil {

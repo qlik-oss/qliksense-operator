@@ -10,11 +10,12 @@ import (
 // customer will add patch into .configuration folder
 type CRConfig struct {
 	// relative to manifestsRoot folder, ex. ./manifests/base
-	ConfigProfile string   `json:"configProfile" yaml:"configProfile"`
-	Secrets       []Secret `json:"secrets,omitempty" yaml:"secrets,omitempty"`
-	Configs       []Config `json:"configs,omitempty" yaml:"configs,omitempty"`
-	ManifestsRoot string   `json:"manifestsRoot,omitempty" yaml:"manifestsRoot,omitempty"`
-	GenerateKeys  bool     `json:"generateKeys,omitempty" yaml:"generateKeys,omitempty"`
+	ConfigProfile    string   `json:"configProfile" yaml:"configProfile"`
+	Secrets          []Secret `json:"secrets,omitempty" yaml:"secrets,omitempty"`
+	Configs          []Config `json:"configs,omitempty" yaml:"configs,omitempty"`
+	ManifestsRoot    string   `json:"manifestsRoot,omitempty" yaml:"manifestsRoot,omitempty"`
+	GenerateKeys     bool     `json:"generateKeys,omitempty" yaml:"generateKeys,omitempty"`
+	StorageClassName string   `json:"storageClassName,omitempty" yaml:"storageClassName,omitempty"`
 }
 type Secret struct {
 	SecretKey string            `json:"secretKey" yaml:"secretKey"`
