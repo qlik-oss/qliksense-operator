@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 )
 
+// It will enable storageClassName transformer
 func ProcessStorageClassName(cr *config.CRConfig) error {
 	if cr.StorageClassName == "" {
 		// no storage class defined
@@ -18,7 +19,10 @@ func ProcessStorageClassName(cr *config.CRConfig) error {
 		log.Panic(storageClassFileName + " does not exist ")
 		return err
 	}
+	return enableStorageClassNameTransformer(storageClassFileName)
+}
 
+func enableStorageClassNameTransformer(storageClassFileName string) error {
 	//sed -i -e 's/value\: false/value\: true/g' storage-class.yaml
 	s := `s/value\: false/value\: true/g`
 	cmd := exec.Command("sed", "-i", "-e", s, storageClassFileName)
