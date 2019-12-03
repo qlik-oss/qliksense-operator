@@ -49,6 +49,7 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	// process cr.storageClassName
 	qust.ProcessStorageClassName(cr)
 
+	log.Printf("cr.RotateKeys value is: %v\n", cr.RotateKeys)
 	if cr.RotateKeys == "yes" {
 		generateKeys(cr, defaultEjsonKeydir)
 	}
