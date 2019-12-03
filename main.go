@@ -1,11 +1,17 @@
 package main
 
 import (
+	"github.com/Shopify/ejson"
+	"io/ioutil"
 	"log"
+	"os"
+	"path"
 
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/qust"
 )
+
+const defaultEjsonKeydir = "/opt/ejson/keys"
 
 func main() {
 	log.Println("running qliksense-operator .... ")
@@ -44,9 +50,24 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	qust.ProcessStorageClassName(cr)
 
 	if cr.GenerateKeys {
-		err := qust.GenerateKeys(cr)
-		if err != nil {
-			log.Printf("error generating keys: %v\n", err)
-		}
+		generateKeys(cr, defaultEjsonKeydir)
 	}
+}
+
+func generateKeys(cr *config.CRConfig, defaultKeyDir string) {
+	if ejsonPublicKey, ejsonPrivateKey, err := ejson.GenerateKeypair(); err != nil {
+		log.Printf("error generating an ejson key pair: %v\n", err)
+	} else if err := qust.GenerateKeys(cr, ejsonPublicKey); err != nil {
+		log.Printf("error generating application keys: %v\n", err)
+	} else if err := ioutil.WriteFile(path.Join(getEjsonKeyDir(defaultKeyDir), ejsonPublicKey), []byte(ejsonPrivateKey), 0777); err != nil {
+		log.Printf("error storing ejson private key: %v\n", err)
+	}
+}
+
+func getEjsonKeyDir(defaultKeyDir string) string {
+	ejsonKeyDir := os.Getenv("EJSON_KEYDIR")
+	if ejsonKeyDir == "" {
+		ejsonKeyDir = defaultKeyDir
+	}
+	return ejsonKeyDir
 }

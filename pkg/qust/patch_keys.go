@@ -22,7 +22,17 @@ type serviceT struct {
 	JWKS       string
 }
 
-func GenerateKeys(cr *config.CRConfig) error {
+type serviceForEjsonT struct {
+	*serviceT
+	EjsonPublicKey string
+}
+
+type serviceListForEjsonT struct {
+	Services       []*serviceT
+	EjsonPublicKey string
+}
+
+func GenerateKeys(cr *config.CRConfig, ejsonPublicKey string) error {
 	serviceList, err := initServiceList(cr)
 	if err != nil {
 		return err
@@ -36,11 +46,11 @@ func GenerateKeys(cr *config.CRConfig) error {
 		service.PrivateKey = strings.Replace(service.PrivateKey, "\n", `\n`, -1)
 		service.JWKS = strings.Replace(service.JWKS, `"`, `\"`, -1)
 
-		if err := writeServiceSecrets(cr, service); err != nil {
+		if err := writeServiceSecrets(cr, service, ejsonPublicKey); err != nil {
 			return err
 		}
 	}
-	if err := writeKeysConfigs(cr, serviceList); err != nil {
+	if err := writeKeysConfigs(cr, serviceList, ejsonPublicKey); err != nil {
 		return err
 	}
 	if err := overrideSecretsKustomizationYaml(cr, serviceList); err != nil {
@@ -69,11 +79,11 @@ func initServiceList(cr *config.CRConfig) ([]*serviceT, error) {
 	return serviceList, nil
 }
 
-func writeServiceSecrets(cr *config.CRConfig, service *serviceT) error {
+func writeServiceSecrets(cr *config.CRConfig, service *serviceT, ejsonPublicKey string) error {
 	if err := setupServiceSecretsDirectory(cr, service); err != nil {
 		return err
 	}
-	if err := writeServiceEpriviteKeyJsonFile(cr, service); err != nil {
+	if err := writeServiceEpriviteKeyJsonFile(cr, service, ejsonPublicKey); err != nil {
 		return err
 	}
 	if err := writeServiceSelectivePatchYamlFile(cr, service); err != nil {
@@ -82,11 +92,11 @@ func writeServiceSecrets(cr *config.CRConfig, service *serviceT) error {
 	return nil
 }
 
-func writeKeysConfigs(cr *config.CRConfig, serviceList []*serviceT) error {
+func writeKeysConfigs(cr *config.CRConfig, serviceList []*serviceT, ejsonPublicKey string) error {
 	if err := setupKeysConfigsDirectory(cr); err != nil {
 		return err
 	}
-	if err := writeKeysEjwksJsonFile(cr, serviceList); err != nil {
+	if err := writeKeysEjwksJsonFile(cr, serviceList, ejsonPublicKey); err != nil {
 		return err
 	}
 	if err := writeKeysSelectivePatchYamlFile(cr, serviceList); err != nil {
@@ -179,13 +189,13 @@ func setupServiceSecretsDirectory(cr *config.CRConfig, service *serviceT) error 
 	return nil
 }
 
-func writeServiceEpriviteKeyJsonFile(cr *config.CRConfig, service *serviceT) error {
+func writeServiceEpriviteKeyJsonFile(cr *config.CRConfig, service *serviceT, ejsonPublicKey string) error {
 	templateFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "templates/keys/service_secrets/eprivate_key.json.tmpl")
 	destinationFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets", service.Name, "eprivate_key.json")
 	var byteBuffer bytes.Buffer
 	if template, err := template.New(path.Base(templateFilePath)).ParseFiles(templateFilePath); err != nil {
 		return err
-	} else if err := template.Execute(&byteBuffer, service); err != nil {
+	} else if err := template.Execute(&byteBuffer, serviceForEjsonT{serviceT: service, EjsonPublicKey: ejsonPublicKey}); err != nil {
 		return err
 	} else if file, err := os.Create(destinationFilePath); err != nil {
 		return err
@@ -229,13 +239,13 @@ func setupKeysConfigsDirectory(cr *config.CRConfig) error {
 	return nil
 }
 
-func writeKeysEjwksJsonFile(cr *config.CRConfig, services []*serviceT) error {
+func writeKeysEjwksJsonFile(cr *config.CRConfig, services []*serviceT, ejsonPublicKey string) error {
 	templateFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "templates/keys/keys_configs/ejwks.json.tmpl")
 	destinationFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/keys/ejwks.json")
 	var byteBuffer bytes.Buffer
 	if template, err := template.New(path.Base(templateFilePath)).ParseFiles(templateFilePath); err != nil {
 		return err
-	} else if err := template.Execute(&byteBuffer, services); err != nil {
+	} else if err := template.Execute(&byteBuffer, serviceListForEjsonT{Services: services, EjsonPublicKey: ejsonPublicKey}); err != nil {
 		return err
 	} else if file, err := os.Create(destinationFilePath); err != nil {
 		return err

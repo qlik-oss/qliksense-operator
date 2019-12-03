@@ -17,8 +17,7 @@ import (
 )
 
 func TestSetupServiceSecretsDirectory(t *testing.T) {
-	publicKey, _, err := ejson.GenerateKeypair()
-	tmpManifestsRootDir, err := setupTests(t, "TestSetupServiceSecretsDirectory-", publicKey)
+	tmpManifestsRootDir, err := SetupTests("TestSetupServiceSecretsDirectory-")
 	if err == nil {
 		defer func() {
 			err := os.RemoveAll(tmpManifestsRootDir)
@@ -46,12 +45,12 @@ func TestSetupServiceSecretsDirectory(t *testing.T) {
 	kustomizationFileBytes, err := ioutil.ReadFile(kustomizationFilePath)
 	assert.NoError(t, err)
 
-	assert.Equal(t, serviceSecrets_kustomizationYaml, string(kustomizationFileBytes))
+	assert.Equal(t, TestConfigHarness.ServiceSecrets.KustomizationYaml, string(kustomizationFileBytes))
 }
 
 func TestWriteServiceEpriviteKeyJsonFile(t *testing.T) {
 	publicKey, privateKey, err := ejson.GenerateKeypair()
-	tmpManifestsRootDir, err := setupTests(t, "TestWriteServiceEpriviteKeyJsonFile-", publicKey)
+	tmpManifestsRootDir, err := SetupTests("TestWriteServiceEpriviteKeyJsonFile-")
 	if err == nil {
 		defer func() {
 			err := os.RemoveAll(tmpManifestsRootDir)
@@ -76,13 +75,13 @@ func TestWriteServiceEpriviteKeyJsonFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	service.PrivateKey = strings.Replace(service.PrivateKey, "\n", "\\n", -1)
-	err = writeServiceEpriviteKeyJsonFile(cr, service)
+	err = writeServiceEpriviteKeyJsonFile(cr, service, publicKey)
 	assert.NoError(t, err)
 
-	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, service.Name, privateKey)
+	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, service.Name, publicKey, privateKey)
 }
 
-func verifyServiceEpriviteKeyJsonFile(t *testing.T, tmpManifestsRootDir string, serviceName string, privateKey string) {
+func verifyServiceEpriviteKeyJsonFile(t *testing.T, tmpManifestsRootDir, serviceName, ejsonPublicKey, ejsonPrivateKey string) {
 	ePrivateKeyJsonFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, fmt.Sprintf("secrets/%v/eprivate_key.json", serviceName))
 	ePrivateKeyJsonFileBytes, err := ioutil.ReadFile(ePrivateKeyJsonFilePath)
 	assert.NoError(t, err)
@@ -90,6 +89,8 @@ func verifyServiceEpriviteKeyJsonFile(t *testing.T, tmpManifestsRootDir string, 
 	var ePrivateKeyJsonMap map[string]interface{}
 	err = json.Unmarshal(ePrivateKeyJsonFileBytes, &ePrivateKeyJsonMap)
 	assert.NoError(t, err)
+
+	assert.Equal(t, ejsonPublicKey, ePrivateKeyJsonMap["_public_key"])
 
 	_, privateKeyPropExists := ePrivateKeyJsonMap["private_key"]
 	assert.True(t, privateKeyPropExists)
@@ -99,7 +100,7 @@ func verifyServiceEpriviteKeyJsonFile(t *testing.T, tmpManifestsRootDir string, 
 	_, kidPropExists := ePrivateKeyJsonMap["kid"]
 	assert.True(t, kidPropExists)
 
-	decryptedBytes, err := ejson.DecryptFile(ePrivateKeyJsonFilePath, "", privateKey)
+	decryptedBytes, err := ejson.DecryptFile(ePrivateKeyJsonFilePath, "", ejsonPrivateKey)
 	assert.NoError(t, err)
 
 	var decryptedMap map[string]interface{}
@@ -111,8 +112,7 @@ func verifyServiceEpriviteKeyJsonFile(t *testing.T, tmpManifestsRootDir string, 
 }
 
 func TestWriteServiceSelectivePatchYamlFile(t *testing.T) {
-	publicKey, _, err := ejson.GenerateKeypair()
-	tmpManifestsRootDir, err := setupTests(t, "TestWriteServiceSelectivePatchYamlFile-", publicKey)
+	tmpManifestsRootDir, err := SetupTests("TestWriteServiceSelectivePatchYamlFile-")
 	if err == nil {
 		defer func() {
 			err := os.RemoveAll(tmpManifestsRootDir)
@@ -219,8 +219,8 @@ resources:
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			publicKey, privateKey, err := ejson.GenerateKeypair()
-			tmpManifestsRootDir, err := setupTests(t, fmt.Sprintf("TestGenerateKeys-%v-", testCase.name), publicKey)
+			ejsonPublicKey, ejsonPrivateKey, err := ejson.GenerateKeypair()
+			tmpManifestsRootDir, err := SetupTests(fmt.Sprintf("TestGenerateKeys-%v-", testCase.name))
 			if err == nil {
 				defer func() {
 					err := os.RemoveAll(tmpManifestsRootDir)
@@ -243,10 +243,10 @@ resources:
 				ManifestsRoot: tmpManifestsRootDir,
 			}
 
-			err = GenerateKeys(cr)
+			err = GenerateKeys(cr, ejsonPublicKey)
 			assert.NoError(t, err)
 
-			verifyServicePatches(t, tmpManifestsRootDir, privateKey)
+			verifyServicePatches(t, tmpManifestsRootDir, ejsonPublicKey, ejsonPrivateKey)
 			verifySecretsAndConfigsKustomizationFiles(t, secretsKustomizationYamlPath, configsKustomizationYamlPath)
 		})
 	}
@@ -273,9 +273,9 @@ func verifySecretsAndConfigsKustomizationFiles(t *testing.T, secretsKustomizatio
 	assert.Contains(t, configsKustomizationYamlMap["resources"].([]interface{}), "keys")
 }
 
-func verifyServicePatches(t *testing.T, tmpManifestsRootDir string, privateKey string) {
-	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "foo", privateKey)
-	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "bar", privateKey)
+func verifyServicePatches(t *testing.T, tmpManifestsRootDir, ejsonPublicKey string, ejsonPrivateKey string) {
+	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "foo", ejsonPublicKey, ejsonPrivateKey)
+	verifyServiceEpriviteKeyJsonFile(t, tmpManifestsRootDir, "bar", ejsonPublicKey, ejsonPrivateKey)
 
 	verifyServiceSelectivePatchYamlFile(t, tmpManifestsRootDir, "foo")
 	verifyServiceSelectivePatchYamlFile(t, tmpManifestsRootDir, "bar")
@@ -283,12 +283,12 @@ func verifyServicePatches(t *testing.T, tmpManifestsRootDir string, privateKey s
 	keysConfigsKustomizationFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/kustomization.yaml")
 	keysConfigsKustomizationFileBytes, err := ioutil.ReadFile(keysConfigsKustomizationFilePath)
 	assert.NoError(t, err)
-	assert.Equal(t, keysConfigs_kustomizationYaml, string(keysConfigsKustomizationFileBytes))
+	assert.Equal(t, TestConfigHarness.KeysConfigs.KustomizationYaml, string(keysConfigsKustomizationFileBytes))
 
 	keysConfigsGomplateFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/gomplate.yaml")
 	keysConfigsGomplateFileBytes, err := ioutil.ReadFile(keysConfigsGomplateFilePath)
 	assert.NoError(t, err)
-	assert.Equal(t, keysConfigs_gomplateYaml, string(keysConfigsGomplateFileBytes))
+	assert.Equal(t, TestConfigHarness.KeysConfigs.GomplateYaml, string(keysConfigsGomplateFileBytes))
 
 	keysConfigsSelectivePatchYamlFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/selectivepatch.yaml")
 	keysConfigsSelectivePatchYamlFileBytes, err := ioutil.ReadFile(keysConfigsSelectivePatchYamlFilePath)
@@ -311,6 +311,8 @@ func verifyServicePatches(t *testing.T, tmpManifestsRootDir string, privateKey s
 	var eJwksJsonMap map[string]interface{}
 	err = json.Unmarshal(eJwksJsonFileBytes, &eJwksJsonMap)
 	assert.NoError(t, err)
+	assert.Equal(t, ejsonPublicKey, eJwksJsonMap["_public_key"])
+
 	_, fooPropExists := eJwksJsonMap["foo"]
 	assert.True(t, fooPropExists)
 	assert.NotContains(t, eJwksJsonMap["foo"], "BEGIN PUBLIC KEY")
@@ -320,150 +322,15 @@ func verifyServicePatches(t *testing.T, tmpManifestsRootDir string, privateKey s
 	assert.NotContains(t, eJwksJsonMap["bar"], "BEGIN PUBLIC KEY")
 	assert.NotContains(t, eJwksJsonMap["bar"], "END PUBLIC KEY")
 
-	decryptedBytes, err := ejson.DecryptFile(eJwksJsonFilePath, "", privateKey)
+	decryptedBytes, err := ejson.DecryptFile(eJwksJsonFilePath, "", ejsonPrivateKey)
 	assert.NoError(t, err)
 	var decryptedMap map[string]interface{}
 	err = json.Unmarshal(decryptedBytes, &decryptedMap)
 	assert.NoError(t, err)
+	assert.Equal(t, ejsonPublicKey, eJwksJsonMap["_public_key"])
+
 	assert.Contains(t, decryptedMap["foo"], "BEGIN PUBLIC KEY")
 	assert.Contains(t, decryptedMap["foo"], "END PUBLIC KEY")
 	assert.Contains(t, decryptedMap["bar"], "BEGIN PUBLIC KEY")
 	assert.Contains(t, decryptedMap["bar"], "END PUBLIC KEY")
-}
-
-const servicesYaml = `
-- name: foo
-- name: bar
-`
-
-const serviceSecrets_ePrivateKeyJsonTmpl = `{
-  "_public_key": "%v",
-  "private_key": "{{.PrivateKey}}",
-  "kid": "{{.Kid}}"
-}
-`
-const serviceSecrets_kustomizationYaml = `
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - selectivepatch.yaml
-transformers:
-  - ../../../manifests/base/transformers/gomplate
-`
-
-const serviceSecrets_selectivepatchYamlTmpl = `
-apiVersion: qlik.com/v1
-kind: SelectivePatch
-metadata:
-  name: {{.Name}}-component-secrets-operator
-enabled: true
-patches:
-- target:
-    kind: SuperSecret
-  patch: |-
-    apiVersion: qlik.com/v1
-    kind: SuperSecret
-    metadata:
-      name: {{.Name}}-secrets
-    stringData:
-      tokenAuthPrivateKeyId: (( (ds "data").kid ))
-      tokenAuthPrivateKey: |
-        ((- "\n"))(( (ds "data").private_key | indent 8 ))
-`
-
-const keysConfigs_ejwksJsonTmpl = `{
-  "_public_key": "%v"
-  {{range .}},"{{.Name}}": "{{.JWKS}}"
-  {{end}}
-}
-`
-
-const keysConfigs_gomplateYaml = `
-apiVersion: qlik.com/v1
-kind: Gomplate
-metadata:
-  name: gomplate
-  labels:
-    key: gomplate
-dataSource:
-  ejson:
-    filePath: ejwks.json
-`
-
-const keysConfigs_kustomizationYaml = `
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - selectivepatch.yaml
-transformers:
-  - gomplate.yaml
-`
-
-const keysConfigs_selectivepatchYamlTmpl = `
-apiVersion: qlik.com/v1
-kind: SelectivePatch
-metadata:
-  name: keys-operator-configs
-enabled: true
-patches:
-  - target:
-      labelSelector: app=keys
-      kind: SuperConfigMap
-    patch: |-
-      apiVersion: qlik.com/v1
-      kind: SuperConfigMap
-      metadata:
-        name: keys-configs
-      data:
-        {{range .}}qlik.api.internal-{{.Name}}: (( (ds "data").{{.Name}} ))
-        {{end}}
-`
-
-func setupTests(t *testing.T, tmpDirPrefix string, publicKey string) (tmpDir string, err error) {
-	tmpDir, err = ioutil.TempDir("", tmpDirPrefix)
-	if err != nil {
-		return "", err
-	}
-
-	if err := os.MkdirAll(filepath.Join(tmpDir, operatorPatchBaseFolder, "configs"), 0777); err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(filepath.Join(tmpDir, operatorPatchBaseFolder, "secrets"), 0777); err != nil {
-		return "", err
-	}
-
-	if err := os.MkdirAll(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs"), 0777); err != nil {
-		return "", err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/ejwks.json.tmpl"), []byte(fmt.Sprintf(keysConfigs_ejwksJsonTmpl, publicKey)), 0777); err != nil {
-		return "", err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/gomplate.yaml"), []byte(keysConfigs_gomplateYaml), 0777); err != nil {
-		return "", err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/kustomization.yaml"), []byte(keysConfigs_kustomizationYaml), 0777); err != nil {
-		return "", err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/keys_configs/selectivepatch.yaml.tmpl"), []byte(keysConfigs_selectivepatchYamlTmpl), 0777); err != nil {
-		return "", err
-	}
-
-	if err := os.MkdirAll(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets"), 0777); err != nil {
-		return "", err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets/eprivate_key.json.tmpl"), []byte(fmt.Sprintf(serviceSecrets_ePrivateKeyJsonTmpl, publicKey)), 0777); err != nil {
-		return "", err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets/kustomization.yaml"), []byte(serviceSecrets_kustomizationYaml), 0777); err != nil {
-		return "", err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/service_secrets/selectivepatch.yaml.tmpl"), []byte(serviceSecrets_selectivepatchYamlTmpl), 0777); err != nil {
-		return "", err
-	}
-
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, operatorPatchBaseFolder, "templates/keys/services.yaml"), []byte(servicesYaml), 0777); err != nil {
-		return "", err
-	}
-
-	return tmpDir, err
 }
