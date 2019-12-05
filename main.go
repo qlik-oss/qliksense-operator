@@ -20,7 +20,7 @@ func main() {
 		log.Panic("Something wrong in CR ", err)
 	}
 	if cr.ManifestsRoot != "" {
-		log.Println("manifests are in local file system")
+		log.Printf("manifests are in local file system in %v\n", cr.ManifestsRoot)
 		// no repo opeations needed
 		processInLocalFileSystem(cr)
 	}
@@ -49,18 +49,21 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	// process cr.storageClassName
 	qust.ProcessStorageClassName(cr)
 
-	log.Printf("cr.RotateKeys value is: %v\n", cr.RotateKeys)
 	if cr.RotateKeys == "yes" {
+		log.Println("rotating all keys")
 		generateKeys(cr, defaultEjsonKeydir)
 	}
 }
 
 func generateKeys(cr *config.CRConfig, defaultKeyDir string) {
+	keyDir := getEjsonKeyDir(defaultKeyDir)
 	if ejsonPublicKey, ejsonPrivateKey, err := ejson.GenerateKeypair(); err != nil {
 		log.Printf("error generating an ejson key pair: %v\n", err)
 	} else if err := qust.GenerateKeys(cr, ejsonPublicKey); err != nil {
 		log.Printf("error generating application keys: %v\n", err)
-	} else if err := ioutil.WriteFile(path.Join(getEjsonKeyDir(defaultKeyDir), ejsonPublicKey), []byte(ejsonPrivateKey), 0777); err != nil {
+	} else if err := os.MkdirAll(keyDir, 0777); err != nil {
+		log.Printf("error makeing sure private key storage directory: %v exists, error: %v\n", keyDir, err)
+	} else if err := ioutil.WriteFile(path.Join(keyDir, ejsonPublicKey), []byte(ejsonPrivateKey), 0777); err != nil {
 		log.Printf("error storing ejson private key: %v\n", err)
 	}
 }

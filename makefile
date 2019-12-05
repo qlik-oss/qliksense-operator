@@ -74,7 +74,7 @@ clean: clean-packr
 	-rm -fr bin/
 
 build-docker:
-	docker build $(BINDIR) -t qlik/qliksense-operator:$(VERSION)
+	docker build . -t qlik/qliksense-operator:$(VERSION)
 
 docker-push: build-docker
 	docker push $(REPOSITORY)

@@ -110,7 +110,7 @@ patches:
       metadata:
         name: keys-configs
       data:
-        {{range .}}qlik.api.internal-{{.Name}}: (( (ds "data").{{.Name}} ))
+        {{range .}}qlik.api.internal-{{.Name}}: ((index (ds "data") "{{.Name}}" | quote))
         {{end}}
 `,
 	},

@@ -301,8 +301,8 @@ func verifyServicePatches(t *testing.T, tmpManifestsRootDir, ejsonPublicKey stri
 	var patchYamlMap map[string]interface{}
 	err = yaml.Unmarshal([]byte(selectivePatchYamlMap["patches"].([]interface{})[0].(map[interface{}]interface{})["patch"].(string)), &patchYamlMap)
 	assert.NoError(t, err)
-	assert.Equal(t, `(( (ds "data").foo ))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-foo"])
-	assert.Equal(t, `(( (ds "data").bar ))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-bar"])
+	assert.Equal(t, `((index (ds "data") "foo" | quote))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-foo"])
+	assert.Equal(t, `((index (ds "data") "bar" | quote))`, patchYamlMap["data"].(map[interface{}]interface{})["qlik.api.internal-bar"])
 
 	eJwksJsonFilePath := filepath.Join(tmpManifestsRootDir, operatorPatchBaseFolder, "configs/keys/ejwks.json")
 	eJwksJsonFileBytes, err := ioutil.ReadFile(eJwksJsonFilePath)

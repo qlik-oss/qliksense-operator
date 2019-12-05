@@ -208,12 +208,18 @@ func writeServiceEpriviteKeyJsonFile(cr *config.CRConfig, service *serviceT, ejs
 func writeServiceSelectivePatchYamlFile(cr *config.CRConfig, service *serviceT) error {
 	templateFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "templates/keys/service_secrets/selectivepatch.yaml.tmpl")
 	destinationFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "secrets", service.Name, "selectivepatch.yaml")
+	var buffer bytes.Buffer
 	if template, err := template.New(path.Base(templateFilePath)).ParseFiles(templateFilePath); err != nil {
 		return err
 	} else if file, err := os.Create(destinationFilePath); err != nil {
 		return err
-	} else if err := template.Execute(file, service); err != nil {
+	} else if err := template.Execute(&buffer, service); err != nil {
 		return err
+	} else {
+		makeYamlSafe(&buffer)
+		if _, err := buffer.WriteTo(file); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -258,14 +264,27 @@ func writeKeysEjwksJsonFile(cr *config.CRConfig, services []*serviceT, ejsonPubl
 func writeKeysSelectivePatchYamlFile(cr *config.CRConfig, services []*serviceT) error {
 	templateFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "templates/keys/keys_configs/selectivepatch.yaml.tmpl")
 	destinationFilePath := filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder, "configs/keys/selectivepatch.yaml")
+	var buffer bytes.Buffer
 	if template, err := template.New(path.Base(templateFilePath)).ParseFiles(templateFilePath); err != nil {
 		return err
 	} else if file, err := os.Create(destinationFilePath); err != nil {
 		return err
-	} else if err := template.Execute(file, services); err != nil {
+	} else if err := template.Execute(&buffer, services); err != nil {
 		return err
+	} else {
+		makeYamlSafe(&buffer)
+		if _, err := buffer.WriteTo(file); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func makeYamlSafe(buffer *bytes.Buffer) {
+	yamlSafeBytes := bytes.TrimSpace(buffer.Bytes())
+	buffer.Reset()
+	buffer.Write(yamlSafeBytes)
+	buffer.WriteRune('\n')
 }
 
 func smallFileCopy(srcPath string, dstPath string, perm os.FileMode, transform func([]byte) ([]byte, error)) error {
