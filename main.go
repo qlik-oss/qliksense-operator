@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/Shopify/ejson"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 
+	"github.com/Shopify/ejson"
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/qust"
 )
