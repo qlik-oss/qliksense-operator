@@ -2,8 +2,13 @@ package qust
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
+	"io/ioutil"
+	"os"
+	"path"
 	"testing"
+
+	"github.com/qlik-oss/qliksense-operator/pkg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdateSelectivePatchYaml(t *testing.T) {
@@ -90,14 +95,34 @@ patches:
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			transformedYamlBytes, err := updateSelectivePatchYaml([]byte(testCase.baseSelectivePatchYaml), []*serviceT{
-				&serviceT{Name: "foo"},
-				&serviceT{Name: "bar"},
-			})
+			transformedYamlBytes, err := updateSelectivePatchYaml(
+				[]byte(testCase.baseSelectivePatchYaml),
+				[]*serviceT{{Name: "foo"}, {Name: "bar"}})
 			assert.NoError(t, err)
 
 			fmt.Printf("transformedYamlBytes: %v\n", string(transformedYamlBytes))
 			assert.Equal(t, testCase.expectedSelectivePatchYaml, string(transformedYamlBytes))
 		})
+	}
+}
+
+func TestInitServiceList(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := os.MkdirAll(path.Join(dir, ".operator/keys/secrets/foo"), 0777); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(path.Join(dir, ".operator/keys/secrets/bar"), 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	if services, err := initServiceList(&config.CRConfig{ManifestsRoot: dir}); err != nil {
+		t.Fatal(err)
+	} else {
+		assert.Equal(t, []*serviceT{{Name: "bar"}, {Name: "foo"}}, services)
 	}
 }

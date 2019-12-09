@@ -2,15 +2,17 @@ package qust
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/Shopify/ejson"
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/keys"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 )
 
 const operatorKeysBaseFolder = "keys"
@@ -60,7 +62,7 @@ func initServiceList(cr *config.CRConfig) ([]*serviceT, error) {
 		return nil, err
 	}
 
-	return serviceList, nil
+	return append(serviceList[:0], serviceList[0+1:]...), nil
 }
 
 func overrideServiceEpriviteKeyJsonFile(cr *config.CRConfig, service *serviceT, ejsonPublicKey string) error {
@@ -80,7 +82,7 @@ func overrideKeysEjwksJsonFile(cr *config.CRConfig, services []*serviceT, ejsonP
 	eJwksMap := make(map[string]string)
 	eJwksMap["_public_key"] = ejsonPublicKey
 	for _, service := range services {
-		eJwksMap[service.Name] = service.JWKS
+		eJwksMap[service.Name] = base64.StdEncoding.EncodeToString([]byte(service.JWKS))
 	}
 
 	if err := writeToEjsonFile(eJwksMap, filepath.Join(cr.ManifestsRoot, operatorPatchBaseFolder,
@@ -144,7 +146,7 @@ func updateSelectivePatchYaml(selectivePatchYamlBytes []byte, services []*servic
 					for _, service := range services {
 						// adding "\n" to the end of the value string to force the block scalar yaml format:
 						dataMapItems.Value = append(dataMapItems.Value.([]yaml.MapItem), yaml.MapItem{
-							Key: fmt.Sprintf("qlik.api.internal-%v", service.Name),
+							Key:   fmt.Sprintf("qlik.api.internal-%v", service.Name),
 							Value: fmt.Sprintf(`(( index (ds "data") "%v" | base64.Decode ))`, service.Name) + "\n",
 						})
 					}
