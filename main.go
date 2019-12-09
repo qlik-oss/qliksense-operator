@@ -26,6 +26,7 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	// process cr.storageClassName
 	if cr.StorageClassName != "" {
 		qust.ProcessStorageClassName(cr)
+		// added to the configs so that down the road it is being processed
 		c := config.Config{
 			DataKey: "storageClassName",
 			Values: map[string]string{
@@ -34,14 +35,13 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 		}
 		cr.Configs = append(cr.Configs, c)
 	}
+	// process cr.Namespace
+	qust.ProcessNamespace(cr)
 
 	// Process cr.configs
 	qust.ProcessCrConfigs(cr)
 	// Process cr.secrets
 	qust.ProcessCrSecrets(cr)
-
-	// process cr.storageClassName
-	qust.ProcessStorageClassName(cr)
 
 	if cr.GenerateKeys {
 		err := qust.GenerateKeys(cr)

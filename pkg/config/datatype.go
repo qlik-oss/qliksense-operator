@@ -16,6 +16,7 @@ type CRConfig struct {
 	ManifestsRoot    string   `json:"manifestsRoot,omitempty" yaml:"manifestsRoot,omitempty"`
 	GenerateKeys     bool     `json:"generateKeys,omitempty" yaml:"generateKeys,omitempty"`
 	StorageClassName string   `json:"storageClassName,omitempty" yaml:"storageClassName,omitempty"`
+	NameSpace        string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 }
 type Secret struct {
 	SecretKey string            `json:"secretKey" yaml:"secretKey"`

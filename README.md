@@ -14,6 +14,9 @@ manifests-root
 |   |  |--kustomization.yaml
 |   |--patches
 |   |  |--kustomization.yaml
+|   |--transformers
+|   |  |--kustomization.yaml
+|   |  |--storge-class.yaml
 |--manifests
 |  |--base
 |  |  |........
@@ -26,6 +29,7 @@ It works based on CR config yaml in environment variable `YAML_CONF`. The CR con
 configProfile: manifests/base
 manifestsRoot: "/cnab/app"
 storageClassName: efs
+namespace: whatever
 configs:
 - dataKey: acceptEULA
   values:
