@@ -6,6 +6,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
+
 	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
 )
@@ -13,6 +14,7 @@ import (
 const (
 	// a folder named .operator exist in manifestsRoot
 	operatorPatchBaseFolder = ".operator"
+	FILE_PERMISION          = 0644
 )
 
 // merge two selective patch by appending sp2.patches into sp1.patch
@@ -71,7 +73,7 @@ func kustFileHelper(kustFile string, fn func(*types.Kustomization)) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(kustFile, d, 0644)
+	err = ioutil.WriteFile(kustFile, d, FILE_PERMISION)
 	return err
 }
 
