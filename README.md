@@ -26,6 +26,7 @@ It works based on CR config yaml in environment variable `YAML_CONF`. The CR con
 configProfile: manifests/base
 manifestsRoot: "/cnab/app"
 storageClassName: efs
+rotateKeys: "yes"
 configs:
 - dataKey: acceptEULA
   values:
