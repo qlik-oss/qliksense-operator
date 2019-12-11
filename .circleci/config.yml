@@ -33,9 +33,9 @@ workflows:
             filters:
               branches:
                 only: master
-        - docker-publish/publish:
+        - docker-publish/publish:     
             image: qlik/qliksense-operator
-            tag: latest
+            tag: echo "`git describe --tags --abbrev=0 2> /dev/null || echo v0`"
             filters:
               branches:
                 only: master
