@@ -30,6 +30,7 @@ configProfile: manifests/base
 manifestsRoot: "/cnab/app"
 storageClassName: efs
 namespace: whatever
+rotateKeys: "yes"
 configs:
 - dataKey: acceptEULA
   values:
