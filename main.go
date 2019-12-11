@@ -1,11 +1,17 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
+	"os"
+	"path"
 
+	"github.com/Shopify/ejson"
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/qust"
 )
+
+const defaultEjsonKeydir = "/opt/ejson/keys"
 
 func main() {
 	log.Println("running qliksense-operator .... ")
@@ -14,7 +20,7 @@ func main() {
 		log.Panic("Something wrong in CR ", err)
 	}
 	if cr.ManifestsRoot != "" {
-		log.Println("manifests are in local file system")
+		log.Printf("manifests are in local file system in %v\n", cr.ManifestsRoot)
 		// no repo opeations needed
 		processInLocalFileSystem(cr)
 	}
@@ -43,10 +49,29 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	// Process cr.secrets
 	qust.ProcessCrSecrets(cr)
 
-	if cr.GenerateKeys {
-		err := qust.GenerateKeys(cr)
-		if err != nil {
-			log.Printf("error generating keys: %v\n", err)
-		}
+	if cr.RotateKeys == "yes" {
+		log.Println("rotating all keys")
+		generateKeys(cr, defaultEjsonKeydir)
 	}
+}
+
+func generateKeys(cr *config.CRConfig, defaultKeyDir string) {
+	keyDir := getEjsonKeyDir(defaultKeyDir)
+	if ejsonPublicKey, ejsonPrivateKey, err := ejson.GenerateKeypair(); err != nil {
+		log.Printf("error generating an ejson key pair: %v\n", err)
+	} else if err := qust.GenerateKeys(cr, ejsonPublicKey); err != nil {
+		log.Printf("error generating application keys: %v\n", err)
+	} else if err := os.MkdirAll(keyDir, 0777); err != nil {
+		log.Printf("error makeing sure private key storage directory: %v exists, error: %v\n", keyDir, err)
+	} else if err := ioutil.WriteFile(path.Join(keyDir, ejsonPublicKey), []byte(ejsonPrivateKey), 0777); err != nil {
+		log.Printf("error storing ejson private key: %v\n", err)
+	}
+}
+
+func getEjsonKeyDir(defaultKeyDir string) string {
+	ejsonKeyDir := os.Getenv("EJSON_KEYDIR")
+	if ejsonKeyDir == "" {
+		ejsonKeyDir = defaultKeyDir
+	}
+	return ejsonKeyDir
 }
