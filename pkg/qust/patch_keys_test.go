@@ -113,10 +113,10 @@ func TestInitServiceList(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	if err := os.MkdirAll(path.Join(dir, ".operator/keys/secrets/foo"), 0777); err != nil {
+	if err := os.MkdirAll(path.Join(dir, ".operator/keys/secrets/foo"), os.ModePerm); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(path.Join(dir, ".operator/keys/secrets/bar"), 0777); err != nil {
+	if err := os.MkdirAll(path.Join(dir, ".operator/keys/secrets/bar"), os.ModePerm); err != nil {
 		t.Fatal(err)
 	}
 

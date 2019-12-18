@@ -5,13 +5,19 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/Shopify/ejson"
 	"github.com/qlik-oss/qliksense-operator/pkg/config"
 	"github.com/qlik-oss/qliksense-operator/pkg/qust"
+	"github.com/qlik-oss/qliksense-operator/pkg/state"
 )
 
-const defaultEjsonKeydir = "/opt/ejson/keys"
+const (
+	defaultEjsonKeydir  = "/opt/ejson/keys"
+	kubeConfigPath      = "/root/.kube/config"
+	backupConfigMapName = "qliksense-operator-state-backup"
+)
 
 func main() {
 	log.Println("running qliksense-operator .... ")
@@ -50,20 +56,23 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	qust.ProcessCrSecrets(cr)
 
 	if cr.RotateKeys == "yes" {
-		log.Println("rotating all keys")
 		generateKeys(cr, defaultEjsonKeydir)
+		backupKeys(cr, defaultEjsonKeydir)
+	} else {
+		restoreKeys(cr, defaultEjsonKeydir)
 	}
 }
 
 func generateKeys(cr *config.CRConfig, defaultKeyDir string) {
+	log.Println("rotating all keys")
 	keyDir := getEjsonKeyDir(defaultKeyDir)
 	if ejsonPublicKey, ejsonPrivateKey, err := ejson.GenerateKeypair(); err != nil {
 		log.Printf("error generating an ejson key pair: %v\n", err)
 	} else if err := qust.GenerateKeys(cr, ejsonPublicKey); err != nil {
 		log.Printf("error generating application keys: %v\n", err)
-	} else if err := os.MkdirAll(keyDir, 0777); err != nil {
+	} else if err := os.MkdirAll(keyDir, os.ModePerm); err != nil {
 		log.Printf("error makeing sure private key storage directory: %v exists, error: %v\n", keyDir, err)
-	} else if err := ioutil.WriteFile(path.Join(keyDir, ejsonPublicKey), []byte(ejsonPrivateKey), 0777); err != nil {
+	} else if err := ioutil.WriteFile(path.Join(keyDir, ejsonPublicKey), []byte(ejsonPrivateKey), os.ModePerm); err != nil {
 		log.Printf("error storing ejson private key: %v\n", err)
 	}
 }
@@ -74,4 +83,24 @@ func getEjsonKeyDir(defaultKeyDir string) string {
 		ejsonKeyDir = defaultKeyDir
 	}
 	return ejsonKeyDir
+}
+
+func backupKeys(cr *config.CRConfig, defaultKeyDir string) {
+	log.Println("backing up keys into the cluster")
+	if err := state.Backup(kubeConfigPath, backupConfigMapName, cr.NameSpace, []state.BackupDir{
+		{ConfigmapKey: "operator-keys", Directory: filepath.Join(cr.ManifestsRoot, ".operator/keys")},
+		{ConfigmapKey: "ejson-keys", Directory: getEjsonKeyDir(defaultKeyDir)},
+	}); err != nil {
+		log.Printf("error backing up keys data to the cluster, error: %v\n", err)
+	}
+}
+
+func restoreKeys(cr *config.CRConfig, defaultKeyDir string) {
+	log.Println("restoring keys from the cluster")
+	if err := state.Restore(kubeConfigPath, backupConfigMapName, cr.NameSpace, []state.BackupDir{
+		{ConfigmapKey: "operator-keys", Directory: filepath.Join(cr.ManifestsRoot, ".operator/keys")},
+		{ConfigmapKey: "ejson-keys", Directory: getEjsonKeyDir(defaultKeyDir)},
+	}); err != nil {
+		log.Printf("error restoring keys data from the cluster, error: %v\n", err)
+	}
 }

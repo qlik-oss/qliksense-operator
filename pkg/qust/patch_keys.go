@@ -98,7 +98,7 @@ func writeToEjsonFile(eJwksMap map[string]string, filePath string) error {
 		return err
 	} else if _, err := ejson.Encrypt(bytes.NewBuffer(jsonBytes), &encryptedBuffer); err != nil {
 		return err
-	} else if err := ioutil.WriteFile(filePath, encryptedBuffer.Bytes(), 0777); err != nil {
+	} else if err := ioutil.WriteFile(filePath, encryptedBuffer.Bytes(), os.ModePerm); err != nil {
 		return err
 	}
 	return nil
@@ -111,7 +111,7 @@ func overrideKeysSelectivePatchYamlFile(cr *config.CRConfig, services []*service
 		return err
 	} else if transformedSelectivePatchBytes, err := updateSelectivePatchYaml(selectivePatchYamlBytes, services); err != nil {
 		return err
-	} else if err := ioutil.WriteFile(filePath, transformedSelectivePatchBytes, 0777); err != nil {
+	} else if err := ioutil.WriteFile(filePath, transformedSelectivePatchBytes, os.ModePerm); err != nil {
 		return err
 	}
 	return nil
