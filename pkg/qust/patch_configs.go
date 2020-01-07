@@ -31,6 +31,9 @@ func createSupperConfigSelectivePatch(confg []config.Config) map[string]*config.
 	spMap := make(map[string]*config.SelectivePatch)
 	for _, conf := range confg {
 		for svc, v := range conf.Values {
+			if v == "" {
+				continue
+			}
 			p := getConfigMapPatchBody(conf.DataKey, svc, v)
 			sp := getSuperConfigSPTemplate(svc)
 			sp.Patches = []types.Patch{p}
