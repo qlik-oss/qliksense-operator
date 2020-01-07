@@ -31,6 +31,9 @@ func createSupperSecretSelectivePatch(sec []config.Secret) map[string]*config.Se
 	spMap := make(map[string]*config.SelectivePatch)
 	for _, se := range sec {
 		for svc, v := range se.Values {
+			if v == "" {
+				continue
+			}
 			p := getSecretPatchBody(se.SecretKey, svc, v)
 			sp := getSuperSecretSPTemplate(svc)
 			sp.Patches = []types.Patch{p}
