@@ -1,4 +1,4 @@
-FROM golang:1.13-alpine as build
+FROM golang:1.13-alpine
 #RUN apt-get update
 #RUN apt-get install gcc curl make -y
 RUN mkdir -p /go/src/qlik-oss/qliksense-operator
