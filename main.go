@@ -55,10 +55,13 @@ func processInLocalFileSystem(cr *config.CRConfig) {
 	// Process cr.secrets
 	qust.ProcessCrSecrets(cr)
 
-	if cr.RotateKeys == "yes" {
+	switch cr.RotateKeys {
+	case "yes":
 		generateKeys(cr, defaultEjsonKeydir)
 		backupKeys(cr, defaultEjsonKeydir)
-	} else {
+	case "None":
+		log.Println("no keys operations, use default. export EJSON_KEY")
+	default:
 		restoreKeys(cr, defaultEjsonKeydir)
 	}
 }
