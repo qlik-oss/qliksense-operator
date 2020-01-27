@@ -7,7 +7,7 @@ workflows:
     jobs:
       - docker-publish/publish:
           image: qlik/qliksense-operator
-          tag: latest
+          tag: v1
 # Golang CircleCI 2.0 configuration file
 #
 # Check https://circleci.com/docs/2.0/language-go/ for more details
