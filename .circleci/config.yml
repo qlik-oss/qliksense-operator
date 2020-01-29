@@ -1,13 +1,13 @@
 
-version: 2.1
-orbs:
-  docker-publish: circleci/docker-publish@0.1.7
-workflows:
-  build_and_publish_docker_image:
-    jobs:
-      - docker-publish/publish:
-          image: qlik/qliksense-operator
-          tag: v1
+# version: 2.1
+# orbs:
+#   docker-publish: circleci/docker-publish@0.1.7
+# workflows:
+#   build_and_publish_docker_image:
+#     jobs:
+#       - docker-publish/publish:
+#           image: qlik/qliksense-operator
+#           tag: ms-3
 # Golang CircleCI 2.0 configuration file
 #
 # Check https://circleci.com/docs/2.0/language-go/ for more details

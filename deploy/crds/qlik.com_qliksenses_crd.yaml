@@ -1,0 +1,102 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: qliksenses.qlik.com
+spec:
+  group: qlik.com
+  names:
+    kind: Qliksense
+    listKind: QliksenseList
+    plural: qliksenses
+    singular: qliksense
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: Qliksense is the Schema for the qliksenses API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: QliksenseSpec defines the desired state of Qliksense
+          properties:
+            configs:
+              additionalProperties:
+                description: operator-sdk needs named type
+                items:
+                  properties:
+                    name:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                  - name
+                  - value
+                  type: object
+                type: array
+              type: object
+            git:
+              properties:
+                accessToken:
+                  type: string
+                password:
+                  type: string
+                repository:
+                  type: string
+                secretName:
+                  type: string
+                userName:
+                  type: string
+              required:
+              - repository
+              - userName
+              type: object
+            manifestsRoot:
+              type: string
+            namespace:
+              type: string
+            profile:
+              description: relative to manifestsRoot folder, ex. ./manifests/base
+              type: string
+            rotateKeys:
+              type: string
+            secrets:
+              additionalProperties:
+                description: operator-sdk needs named type
+                items:
+                  properties:
+                    name:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                  - name
+                  - value
+                  type: object
+                type: array
+              type: object
+            storageClassName:
+              type: string
+          required:
+          - profile
+          type: object
+        status:
+          description: QliksenseStatus defines the observed state of Qliksense
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
