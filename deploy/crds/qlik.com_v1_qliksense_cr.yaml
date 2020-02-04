@@ -1,7 +1,22 @@
 apiVersion: qlik.com/v1
 kind: Qliksense
 metadata:
-  name: example-qliksense
+  name: myqliksense
 spec:
-  # Add fields here
-  size: 3
+  git:
+    repository: https://github.com/my-org/qliksense-k8s
+    userName: qlik
+  profile: manifests/base
+  manifestsRoot: "/cnab/app"
+  storageClassName: efs
+  namespace: whatever
+  rotateKeys: "yes"
+    # yes: generate keys and store in k8s, None: use default keys which is in EJSON_KEY env, no: restore key from k8s cluster
+  configs:
+    qliksense:
+      - name: acceptEULA
+        value: "yes"
+  secrets:
+    qliksense:
+      - name: mongoDbUri
+        value: mongo://mongo:3307
