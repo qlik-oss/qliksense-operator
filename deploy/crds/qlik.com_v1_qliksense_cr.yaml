@@ -1,7 +1,17 @@
 apiVersion: qlik.com/v1
 kind: Qliksense
 metadata:
-  name: example-qliksense
+  name: qliksense-default
+  labels:
+    version: v0.0.1
 spec:
-  # Add fields here
-  size: 3
+  profile: docker-desktop
+  configs:
+    qliksense:
+      - name: acceptEULA
+        value: "yes"
+      - name: acceptEULA
+        value: "yes"
+  manifestsRoot: /Users/mqb/.qliksense/contexts/qliksense-default/qlik-k8s/v0.0.1/manifests
+  storageClassName: mokul
+  namespace: namespace
