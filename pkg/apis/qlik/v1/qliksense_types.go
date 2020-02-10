@@ -1,7 +1,7 @@
 package v1
 
 import (
-	kapis "github.com/qlik-oss/k-apis/config"
+	kapis "github.com/qlik-oss/k-apis/pkg/config"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
