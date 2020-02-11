@@ -60,7 +60,6 @@ spec:
                   type: string
               required:
               - repository
-              - userName
               type: object
             manifestsRoot:
               type: string
@@ -68,6 +67,8 @@ spec:
               type: string
             profile:
               description: relative to manifestsRoot folder, ex. ./manifests/base
+              type: string
+            releaseName:
               type: string
             rotateKeys:
               type: string
