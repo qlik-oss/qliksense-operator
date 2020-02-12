@@ -2,10 +2,10 @@ package qliksense
 
 import (
 	"context"
-	"fmt"
+	_ "fmt"
 	"github.com/go-logr/logr"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
-	"gopkg.in/yaml.v2"
+	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,9 +13,14 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	_ "k8s.io/apimachinery/pkg/types"
+	_ "k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -27,7 +32,10 @@ import (
 
 var log = logf.Log.WithName("controller_qliksense")
 
-const qliksenseFinalizer = "finalizer.qliksense.qlik.com"
+const (
+	qliksenseFinalizer = "finalizer.qliksense.qlik.com"
+	searchingLabel     = "release"
+)
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -106,14 +114,14 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-
-	if b, err := yaml.Marshal(instance); err != nil {
-		reqLogger.Error(err, "cannot marshal qliksense CR")
-	} else {
-		//reqLogger.Info(string(b))
-		fmt.Println(string(b))
-	}
-
+	/*
+		// keep this for debugging pupose
+		if b, err := yaml.Marshal(instance); err != nil {
+			reqLogger.Error(err, "cannot marshal qliksense CR")
+		} else {
+			fmt.Println(string(b))
+		}
+	*/
 	if err := r.updateServiceOwner(instance); err != nil {
 		reqLogger.Error(err, "cannot update service owner")
 		return reconcile.Result{}, err
@@ -163,6 +171,11 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		reqLogger.Error(err, "cannot update network policy owner")
 		return reconcile.Result{}, err
 	}
+	if err := r.updateEngineOwner(instance); err != nil {
+		reqLogger.Error(err, "cannot update Engine owner")
+		return reconcile.Result{}, err
+	}
+
 	// Check if the qliksense instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
 	/*isQliksenseMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
@@ -196,35 +209,12 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 	return reconcile.Result{}, nil
 }
 
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *qlikv1.Qliksense) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
-	}
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
-	}
-}
-
 func (r *ReconcileQliksense) finalizeQliksense(reqLogger logr.Logger, qlik *qlikv1.Qliksense) error {
 	// TODO(user): Add the cleanup steps that the operator
 	// needs to do before the CR can be deleted. Examples
 	// of finalizers include performing backups and deleting
 	// resources that are not owned by this CR, like a PVC.
-	if err := r.client.DeleteAllOf(context.TODO(), &corev1.Service{}, client.MatchingLabels{"release": qlik.Name}); err != nil {
+	if err := r.client.DeleteAllOf(context.TODO(), &corev1.Service{}, client.MatchingLabels{searchingLabel: qlik.Name}); err != nil {
 		reqLogger.Error(err, "Cannot delete service")
 		return nil
 	}
@@ -266,7 +256,7 @@ func remove(list []string, s string) []string {
 func (r *ReconcileQliksense) updateServiceOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.ServiceList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, svc := range listObj.Items {
@@ -284,7 +274,7 @@ func (r *ReconcileQliksense) updateServiceOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateDeploymentOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &appsv1.DeploymentList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, dep := range listObj.Items {
@@ -302,7 +292,7 @@ func (r *ReconcileQliksense) updateDeploymentOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateStatefulSetOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &appsv1.StatefulSetList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, dep := range listObj.Items {
@@ -320,7 +310,7 @@ func (r *ReconcileQliksense) updateStatefulSetOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateIngressOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &v1beta1.IngressList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, ing := range listObj.Items {
@@ -338,7 +328,7 @@ func (r *ReconcileQliksense) updateIngressOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateConfigMapOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.ConfigMapList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -356,7 +346,7 @@ func (r *ReconcileQliksense) updateConfigMapOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateSecretsOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.SecretList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -374,7 +364,7 @@ func (r *ReconcileQliksense) updateSecretsOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updatePvcOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.PersistentVolumeClaimList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -392,7 +382,7 @@ func (r *ReconcileQliksense) updatePvcOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateCronJobOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &batch_v1beta1.CronJobList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -410,7 +400,7 @@ func (r *ReconcileQliksense) updateCronJobOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateServiceAccountOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.ServiceAccountList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -428,7 +418,7 @@ func (r *ReconcileQliksense) updateServiceAccountOwner(q *qlikv1.Qliksense) erro
 func (r *ReconcileQliksense) updateRoleOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &rbacv1.RoleList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -446,7 +436,7 @@ func (r *ReconcileQliksense) updateRoleOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateRoleBindingOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &rbacv1.RoleBindingList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -464,7 +454,7 @@ func (r *ReconcileQliksense) updateRoleBindingOwner(q *qlikv1.Qliksense) error {
 func (r *ReconcileQliksense) updateNetworkPolicyOwner(q *qlikv1.Qliksense) error {
 
 	listObj := &v1beta1.NetworkPolicyList{}
-	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{"release": q.Name}); err != nil {
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
@@ -474,6 +464,42 @@ func (r *ReconcileQliksense) updateNetworkPolicyOwner(q *qlikv1.Qliksense) error
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileQliksense) updateEngineOwner(q *qlikv1.Qliksense) error {
+	// Get a config to talk to the apiserver
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	engineRes := schema.GroupVersionResource{Group: "qixmanager.qlik.com", Version: "v1", Resource: "engines"}
+
+	list, err := dynamicClient.Resource(engineRes).Namespace(q.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	// create owner reference object
+	ref := *metav1.NewControllerRef(q, q.GroupVersionKind())
+
+	for _, d := range list.Items {
+		rls, _, err := unstructured.NestedString(d.Object, "metadata", "labels", searchingLabel)
+		if err != nil {
+			return err
+		}
+		if rls == q.Name {
+			d.SetOwnerReferences([]metav1.OwnerReference{ref})
+			if _, updateErr := dynamicClient.Resource(engineRes).Namespace(q.Namespace).Update(&d, metav1.UpdateOptions{}); updateErr != nil {
+				return err
+			}
 		}
 	}
 	return nil
