@@ -2,17 +2,22 @@ package qliksense
 
 import (
 	"context"
-	"fmt"
+	_ "fmt"
+	"github.com/go-logr/logr"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
-	"gopkg.in/yaml.v2"
+	_ "gopkg.in/yaml.v2"
+	appsv1 "k8s.io/api/apps/v1"
+	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/apimachinery/pkg/types"
+	_ "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	_ "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -21,6 +26,11 @@ import (
 )
 
 var log = logf.Log.WithName("controller_qliksense")
+
+const (
+	qliksenseFinalizer = "finalizer.qliksense.qlik.com"
+	searchingLabel     = "release"
+)
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -54,7 +64,56 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner Qliksense
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &corev1.ServiceAccount{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &corev1.PersistentVolumeClaim{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &v1beta1.Ingress{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
 	})
@@ -62,6 +121,27 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &batch_v1beta1.CronJob{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &rbacv1.Role{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &rbacv1.RoleBinding{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &qlikv1.Qliksense{},
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -86,7 +166,6 @@ type ReconcileQliksense struct {
 func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Qliksense")
-
 	// Fetch the Qliksense instance
 	instance := &qlikv1.Qliksense{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
@@ -100,62 +179,92 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-
-	if b, err := yaml.Marshal(instance); err != nil {
-		reqLogger.Error(err, "cannot marshal qliksense CR")
-	} else {
-		//reqLogger.Info(string(b))
-		fmt.Println(string(b))
+	/*
+		// keep this for debugging pupose
+		if b, err := yaml.Marshal(instance); err != nil {
+			reqLogger.Error(err, "cannot marshal qliksense CR")
+		} else {
+			fmt.Println(string(b))
+		}
+	*/
+	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
+		return reconcile.Result{}, err
 	}
+	reqLogger.Info("owner reference has been updated")
 
-	// // Define a new Pod object
-	// pod := newPodForCR(instance)
+	// Check if the qliksense instance is marked to be deleted, which is
+	// indicated by the deletion timestamp being set.
+	/*isQliksenseMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
+	if isQliksenseMarkedToBeDeleted {
+		if contains(instance.GetFinalizers(), qliksenseFinalizer) {
+			// Run finalization logic for qliksenseFinalizer. If the
+			// finalization logic fails, don't remove the finalizer so
+			// that we can retry during the next reconciliation.
+			if err := r.finalizeQliksense(reqLogger, instance); err != nil {
+				return reconcile.Result{}, err
+			}
 
-	// // Set Qliksense instance as the owner and controller
-	// if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
-	// 	return reconcile.Result{}, err
-	// }
-
-	// // Check if this Pod already exists
-	// found := &corev1.Pod{}
-	// err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
-	// if err != nil && errors.IsNotFound(err) {
-	// 	reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-	// 	err = r.client.Create(context.TODO(), pod)
-	// 	if err != nil {
-	// 		return reconcile.Result{}, err
-	// 	}
-
-	// 	// Pod created successfully - don't requeue
-	// 	return reconcile.Result{}, nil
-	// } else if err != nil {
-	// 	return reconcile.Result{}, err
-	// }
-
-	// // Pod already exists - don't requeue
-	// reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
+			// Remove qliksenseFinalizer. Once all finalizers have been
+			// removed, the object will be deleted.
+			instance.SetFinalizers(remove(instance.GetFinalizers(), qliksenseFinalizer))
+			err := r.client.Update(context.TODO(), instance)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+		return reconcile.Result{}, nil
+	}
+	*/
+	// Add finalizer for this CR
+	/*if !contains(instance.GetFinalizers(), qliksenseFinalizer) {
+		if err := r.addFinalizer(reqLogger, instance); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+	*/
 	return reconcile.Result{}, nil
 }
 
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *qlikv1.Qliksense) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
+func (r *ReconcileQliksense) finalizeQliksense(reqLogger logr.Logger, qlik *qlikv1.Qliksense) error {
+	// TODO(user): Add the cleanup steps that the operator
+	// needs to do before the CR can be deleted. Examples
+	// of finalizers include performing backups and deleting
+	// resources that are not owned by this CR, like a PVC.
+	if err := r.client.DeleteAllOf(context.TODO(), &corev1.Service{}, client.MatchingLabels{searchingLabel: qlik.Name}); err != nil {
+		reqLogger.Error(err, "Cannot delete service")
+		return nil
 	}
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
+	reqLogger.Info("Successfully finalized memcached")
+	return nil
+}
+
+func (r *ReconcileQliksense) addFinalizer(reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+	reqLogger.Info("Adding Finalizer for the Memcached")
+	m.SetFinalizers(append(m.GetFinalizers(), qliksenseFinalizer))
+
+	// Update CR
+	err := r.client.Update(context.TODO(), m)
+	if err != nil {
+		reqLogger.Error(err, "Failed to update Memcached with finalizer")
+		return err
 	}
+	return nil
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func remove(list []string, s string) []string {
+	for i, v := range list {
+		if v == s {
+			list = append(list[:i], list[i+1:]...)
+		}
+	}
+	return list
 }

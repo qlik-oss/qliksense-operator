@@ -24,11 +24,13 @@ import (
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
+	_ "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	_ "sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
 // Change below variables to serve metrics on different host or port.
@@ -102,6 +104,8 @@ func main() {
 
 	log.Info("Registering Components.")
 
+	//schemeBuilder := &scheme.Builder{GroupVersion: schema.GroupVersion{Group: "qixmanager.qlik.com", Version: "v1"}}
+	//schemeBuilder.Register()
 	// Setup Scheme for all resources
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
