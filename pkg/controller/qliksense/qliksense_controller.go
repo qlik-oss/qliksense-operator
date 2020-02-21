@@ -45,7 +45,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileQliksense{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileQliksense{client: mgr.GetClient(), scheme: mgr.GetScheme(), qlikInstances: NewQIs()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -142,6 +142,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	//cannot watch engine resources. because we dont know the type yet
 	return nil
 }
 
@@ -152,8 +154,9 @@ var _ reconcile.Reconciler = &ReconcileQliksense{}
 type ReconcileQliksense struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
+	client        client.Client
+	scheme        *runtime.Scheme
+	qlikInstances *QliksenseInstances
 }
 
 // Reconcile reads that state of the cluster for a Qliksense object and makes changes based on the state read
@@ -179,22 +182,10 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	/*
-		// keep this for debugging pupose
-		if b, err := yaml.Marshal(instance); err != nil {
-			reqLogger.Error(err, "cannot marshal qliksense CR")
-		} else {
-			fmt.Println(string(b))
-		}
-	*/
-	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
-		return reconcile.Result{}, err
-	}
-	reqLogger.Info("owner reference has been updated")
 
 	// Check if the qliksense instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
-	/*isQliksenseMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
+	isQliksenseMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
 	if isQliksenseMarkedToBeDeleted {
 		if contains(instance.GetFinalizers(), qliksenseFinalizer) {
 			// Run finalization logic for qliksenseFinalizer. If the
@@ -214,14 +205,45 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		}
 		return reconcile.Result{}, nil
 	}
+
+	// keep this for debugging pupose
+	/*	if b, err := yaml.Marshal(instance); err != nil {
+			reqLogger.Error(err, "cannot marshal qliksense CR")
+		} else {
+			fmt.Println(string(b))
+		}
 	*/
+
+	// if no git then it was a CLI deployed k8 resources
+	if &instance.Spec.Git != nil {
+		if err := r.qlikInstances.AddToQliksenseInstances(instance); err != nil {
+			reqLogger.Error(err, "Cannot create qliksense object")
+			return reconcile.Result{}, nil
+		}
+		if !r.qlikInstances.IsInstalled(instance.GetName()) {
+			// new install
+			if err := r.qlikInstances.installQliksene(instance.GetName()); err != nil {
+				reqLogger.Error(err, "Cannot create kubernetes resoruces for "+instance.GetName())
+				return reconcile.Result{}, err
+			}
+			// next time jwt keys will not be updated
+			instance.Spec.RotateKeys = "no"
+		}
+
+	}
+	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	reqLogger.Info("owner reference has been updated")
+
 	// Add finalizer for this CR
-	/*if !contains(instance.GetFinalizers(), qliksenseFinalizer) {
+	if !contains(instance.GetFinalizers(), qliksenseFinalizer) {
 		if err := r.addFinalizer(reqLogger, instance); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
-	*/
+
 	return reconcile.Result{}, nil
 }
 
@@ -230,22 +252,26 @@ func (r *ReconcileQliksense) finalizeQliksense(reqLogger logr.Logger, qlik *qlik
 	// needs to do before the CR can be deleted. Examples
 	// of finalizers include performing backups and deleting
 	// resources that are not owned by this CR, like a PVC.
-	if err := r.client.DeleteAllOf(context.TODO(), &corev1.Service{}, client.MatchingLabels{searchingLabel: qlik.Name}); err != nil {
-		reqLogger.Error(err, "Cannot delete service")
-		return nil
+	// if err := r.client.DeleteAllOf(context.TODO(), &corev1.Service{}, client.MatchingLabels{searchingLabel: qlik.Name}); err != nil {
+	// 	reqLogger.Error(err, "Cannot delete service")
+	// 	return nil
+	// }
+	if err := r.qlikInstances.RemoveFromQliksenseInstances(qlik.GetName()); err != nil {
+		reqLogger.Error(err, "cannot remove "+qlik.GetName()+" from instances")
+	} else {
+		reqLogger.Info("Successfully finalized " + qlik.GetName())
 	}
-	reqLogger.Info("Successfully finalized memcached")
 	return nil
 }
 
 func (r *ReconcileQliksense) addFinalizer(reqLogger logr.Logger, m *qlikv1.Qliksense) error {
-	reqLogger.Info("Adding Finalizer for the Memcached")
+	reqLogger.Info("Adding Finalizer for the " + m.GetName())
 	m.SetFinalizers(append(m.GetFinalizers(), qliksenseFinalizer))
 
 	// Update CR
 	err := r.client.Update(context.TODO(), m)
 	if err != nil {
-		reqLogger.Error(err, "Failed to update Memcached with finalizer")
+		reqLogger.Error(err, "Failed to update qliksense with finalizer")
 		return err
 	}
 	return nil

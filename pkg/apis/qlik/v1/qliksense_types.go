@@ -2,7 +2,6 @@ package v1
 
 import (
 	kapis "github.com/qlik-oss/k-apis/pkg/config"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,7 +32,7 @@ type Qliksense struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   QliksenseSpec   `json:"spec,omitempty"`
+	Spec   kapis.CRSpec    `json:"spec,omitempty"`
 	Status QliksenseStatus `json:"status,omitempty"`
 }
 
@@ -48,4 +47,8 @@ type QliksenseList struct {
 
 func init() {
 	SchemeBuilder.Register(&Qliksense{}, &QliksenseList{})
+}
+
+func (q *Qliksense) GetVersion() string {
+	return q.ObjectMeta.Labels["version"]
 }
