@@ -235,7 +235,7 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
-	reqLogger.Info("owner reference has been updated")
+	//reqLogger.Info("owner reference has been updated")
 
 	// Add finalizer for this CR
 	if !contains(instance.GetFinalizers(), qliksenseFinalizer) {

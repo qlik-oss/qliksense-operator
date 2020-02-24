@@ -436,12 +436,22 @@ func (r *ReconcileQliksense) updateEngineOwner(reqLogger logr.Logger, q *qlikv1.
 			return err
 		}
 		if rls == q.Name {
+			alreadySet := false
+			for _, or := range d.GetOwnerReferences() {
+				if or.Name == q.GetName() {
+					alreadySet = true
+					break
+				}
+			}
+			if alreadySet {
+				continue
+			}
 			d.SetOwnerReferences([]metav1.OwnerReference{ref})
 			if _, updateErr := dynamicClient.Resource(engineRes).Namespace(q.Namespace).Update(&d, metav1.UpdateOptions{}); updateErr != nil {
 				return err
 			}
 		}
-		reqLogger.Info("update owner for Engine ")
+		reqLogger.Info("update owner for Engine [ " + d.GetName() + " ]")
 	}
 	return nil
 }

@@ -3,12 +3,12 @@ package qliksense
 import (
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/mitchellh/go-homedir"
 	kapis_config "github.com/qlik-oss/k-apis/pkg/config"
 	kapis_cr "github.com/qlik-oss/k-apis/pkg/cr"
 	_ "github.com/qlik-oss/k-apis/pkg/git"
 	kapis_git "github.com/qlik-oss/k-apis/pkg/git"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
+	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +17,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/kustomize/api/filesys"
@@ -70,17 +69,22 @@ func (qi *QliksenseInstances) GetCRSpec(crName string) *kapis_config.CRSpec {
 }
 
 func cloneGitRepo(crName, ref string, gRepo *kapis_config.Repo) (string, error) {
+	fmt.Println("Clonning staretfffff")
 	destDir := filepath.Join(MANIFEST_ON_DISK_ROOT, crName, ref)
 	if err := os.MkdirAll(destDir, os.ModePerm); err != nil {
+		fmt.Println(err)
 		return "", err
 	}
 	if b, err := IsDirEmpty(destDir); err != nil {
+		fmt.Println("non empty")
 		//previously cloned
 		return destDir, nil
 	} else if b {
 		if repo, err := kapis_git.CloneRepository(destDir, gRepo.Repository, nil); err != nil {
+			fmt.Println("first ifffffff")
 			return "", err
 		} else if err = kapis_git.Checkout(repo, ref, fmt.Sprintf("%v-by-operator-%v", ref, uuid.New().String()), nil); err != nil {
+			fmt.Println("seconddddd ifffffff")
 			return "", err
 		}
 		return destDir, nil
@@ -155,13 +159,21 @@ func executeKustomizeBuild(directory string) ([]byte, error) {
 
 func (qi *QliksenseInstances) installQliksene(crName string) error {
 	crspec := qi.GetCRSpec(crName)
-	userHomeDir, err := homedir.Dir()
-	if err != nil {
-		fmt.Printf(`error fetching user's home directory: %v\n`, err)
-		return err
+	// keep this for debugging pupose
+	if b, err := yaml.Marshal(crspec); err != nil {
+		fmt.Println("cannot marshal qliksense CR Spec")
+		fmt.Println(err)
+	} else {
+		fmt.Println(string(b))
 	}
+
 	// generate patches
-	kapis_cr.GeneratePatches(crspec, path.Join(userHomeDir, ".kube", "config"))
+	// empty string should use in-cluster config
+	dirName, _ := ioutil.TempDir("", "")
+	if err := os.Setenv("EJSON_KEYDIR", dirName); err != nil {
+		fmt.Println(err)
+	}
+	kapis_cr.GeneratePatches(crspec, "")
 	qInitByte, err := executeKustomizeBuild(filepath.Join(crspec.GetManifestsRoot(), crspec.GetProfileDir()))
 	if err != nil {
 		return err
@@ -201,7 +213,7 @@ func kubectlOperation(manifests string, oprName string) error {
 	err = cmd.Run()
 	if err != nil {
 		fmt.Printf("kubectl apply failed with %s\n", err)
-		fmt.Println("temp CRD file: " + tempYaml.Name())
+		fmt.Println("temp file: " + tempYaml.Name())
 		return err
 	}
 	os.Remove(tempYaml.Name())
