@@ -9,6 +9,8 @@ spec:
     listKind: QliksenseList
     plural: qliksenses
     singular: qliksense
+    shortNames:
+    - qs
   scope: Namespaced
   subresources:
     status: {}

@@ -2,6 +2,7 @@ package qliksense
 
 import (
 	"fmt"
+	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	kapis_config "github.com/qlik-oss/k-apis/pkg/config"
 	kapis_cr "github.com/qlik-oss/k-apis/pkg/cr"
@@ -26,8 +27,7 @@ import (
 )
 
 const (
-	MANIFEST_ON_DISK_ROOT = "/tmp/qlik-k8s"
-	Q_INIT_CRD_PATH       = "manifests/base/manifests/qliksense-init"
+	Q_INIT_CRD_PATH = "manifests/base/manifests/qliksense-init"
 )
 
 type QliksenseInstances struct {
@@ -53,6 +53,9 @@ func (qi *QliksenseInstances) AddToQliksenseInstances(qs *qlikv1.Qliksense) erro
 	return nil
 }
 
+func getKuzLogger() logr.Logger {
+	return log.WithValues("activities", "performing-git-kuz-ops")
+}
 func (qi *QliksenseInstances) RemoveFromQliksenseInstances(crName string) error {
 
 	if err := os.RemoveAll(qi.ManifestRootMap[crName]); err != nil {
@@ -68,23 +71,25 @@ func (qi *QliksenseInstances) GetCRSpec(crName string) *kapis_config.CRSpec {
 	return &q.Spec
 }
 
+// clone the git repo and checking out a branch out of it
 func cloneGitRepo(crName, ref string, gRepo *kapis_config.Repo) (string, error) {
-	fmt.Println("Clonning staretfffff")
-	destDir := filepath.Join(MANIFEST_ON_DISK_ROOT, crName, ref)
+	crRoot, err := getCrRootDir(crName)
+	if err != nil {
+		getKuzLogger().Error(err, "cannot get root cr root directory")
+		return "", err
+	}
+	destDir := filepath.Join(crRoot, ref)
 	if err := os.MkdirAll(destDir, os.ModePerm); err != nil {
-		fmt.Println(err)
+		getKuzLogger().Error(err, "cannot create directory")
 		return "", err
 	}
 	if b, err := IsDirEmpty(destDir); err != nil {
-		fmt.Println("non empty")
 		//previously cloned
 		return destDir, nil
 	} else if b {
 		if repo, err := kapis_git.CloneRepository(destDir, gRepo.Repository, nil); err != nil {
-			fmt.Println("first ifffffff")
 			return "", err
 		} else if err = kapis_git.Checkout(repo, ref, fmt.Sprintf("%v-by-operator-%v", ref, uuid.New().String()), nil); err != nil {
-			fmt.Println("seconddddd ifffffff")
 			return "", err
 		}
 		return destDir, nil
@@ -92,6 +97,17 @@ func cloneGitRepo(crName, ref string, gRepo *kapis_config.Repo) (string, error) 
 	return destDir, nil
 }
 
+func getCrRootDir(crName string) (string, error) {
+	if dirName, err := ioutil.TempDir("", ""); err != nil {
+		return "", err
+	} else if err := os.MkdirAll(filepath.Join(dirName, "qlik-k8s", crName), os.ModePerm); err != nil {
+		return "", err
+	} else {
+		return dirName, nil
+	}
+}
+
+// IsInstalled verify if qliksense is installed based on engine resources availability
 func (qi *QliksenseInstances) IsInstalled(crName string) bool {
 	q := qi.InstanceMap[crName]
 	if q == nil {
@@ -161,17 +177,17 @@ func (qi *QliksenseInstances) installQliksene(crName string) error {
 	crspec := qi.GetCRSpec(crName)
 	// keep this for debugging pupose
 	if b, err := yaml.Marshal(crspec); err != nil {
-		fmt.Println("cannot marshal qliksense CR Spec")
-		fmt.Println(err)
+		getKuzLogger().Error(err, "cannot marshal qliksense CR Spec")
+
 	} else {
-		fmt.Println(string(b))
+		getKuzLogger().Info(string(b))
 	}
 
 	// generate patches
 	// empty string should use in-cluster config
 	dirName, _ := ioutil.TempDir("", "")
 	if err := os.Setenv("EJSON_KEYDIR", dirName); err != nil {
-		fmt.Println(err)
+		getKuzLogger().Error(err, "cannot set env for EJSON_KEYDIR")
 	}
 	kapis_cr.GeneratePatches(crspec, "")
 	qInitByte, err := executeKustomizeBuild(filepath.Join(crspec.GetManifestsRoot(), crspec.GetProfileDir()))
@@ -196,7 +212,7 @@ func KubectlDelete(manifests string) error {
 func kubectlOperation(manifests string, oprName string) error {
 	tempYaml, err := ioutil.TempFile("", "")
 	if err != nil {
-		fmt.Println("cannot create file ", err)
+		getKuzLogger().Error(err, "cannot create file ")
 		return err
 	}
 	tempYaml.WriteString(manifests)
@@ -212,8 +228,7 @@ func kubectlOperation(manifests string, oprName string) error {
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("kubectl apply failed with %s\n", err)
-		fmt.Println("temp file: " + tempYaml.Name())
+		getKuzLogger().Error(err, "kubectl apply failed , file"+tempYaml.Name())
 		return err
 	}
 	os.Remove(tempYaml.Name())
