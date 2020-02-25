@@ -63,6 +63,10 @@ func (r *ReconcileQliksense) updateResourceOwner(reqLogger logr.Logger, instance
 		reqLogger.Error(err, "cannot update network policy owner")
 		return err
 	}
+	if err := r.updateIngressOwner(reqLogger, instance); err != nil {
+		reqLogger.Error(err, "cannot update ingress owner")
+		return err
+	}
 	if err := r.updateEngineOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update Engine owner")
 		return err

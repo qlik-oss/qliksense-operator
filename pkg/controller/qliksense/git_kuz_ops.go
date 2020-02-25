@@ -98,12 +98,15 @@ func cloneGitRepo(crName, ref string, gRepo *kapis_config.Repo) (string, error) 
 }
 
 func getCrRootDir(crName string) (string, error) {
-	if dirName, err := ioutil.TempDir("", ""); err != nil {
+	dirName, err := ioutil.TempDir("", "")
+	if err != nil {
 		return "", err
-	} else if err := os.MkdirAll(filepath.Join(dirName, "qlik-k8s", crName), os.ModePerm); err != nil {
+	}
+	destDir := filepath.Join(dirName, "qlik-k8s", crName)
+	if err := os.MkdirAll(destDir, os.ModePerm); err != nil {
 		return "", err
 	} else {
-		return dirName, nil
+		return destDir, nil
 	}
 }
 
@@ -189,11 +192,14 @@ func (qi *QliksenseInstances) installQliksene(crName string) error {
 	if err := os.Setenv("EJSON_KEYDIR", dirName); err != nil {
 		getKuzLogger().Error(err, "cannot set env for EJSON_KEYDIR")
 	}
+	getKuzLogger().Info("generating kustomize patches by k-api")
 	kapis_cr.GeneratePatches(crspec, "")
+	getKuzLogger().Info("executing kustomize build in folder " + filepath.Join(crspec.GetManifestsRoot(), crspec.GetProfileDir()))
 	qInitByte, err := executeKustomizeBuild(filepath.Join(crspec.GetManifestsRoot(), crspec.GetProfileDir()))
 	if err != nil {
 		return err
 	}
+
 	if err := KubectlApply(string(qInitByte)); err != nil {
 		return err
 	}
