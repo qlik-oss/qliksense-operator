@@ -2,7 +2,6 @@ package qliksense
 
 import (
 	"context"
-	_ "fmt"
 	"github.com/go-logr/logr"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
@@ -226,6 +225,7 @@ type ReconcileQliksense struct {
 func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Qliksense")
+
 	// Fetch the Qliksense instance
 	instance := &qlikv1.Qliksense{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
