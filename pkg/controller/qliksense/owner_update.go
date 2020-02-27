@@ -19,51 +19,55 @@ import (
 )
 
 func (r *ReconcileQliksense) updateResourceOwner(reqLogger logr.Logger, instance *qlikv1.Qliksense) error {
-	if err := r.updateServiceOwner(instance); err != nil {
+	if err := r.updateServiceOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update service owner")
 		return err
 	}
-	if err := r.updateDeploymentOwner(instance); err != nil {
+	if err := r.updateDeploymentOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update deployments owner")
 		return err
 	}
-	if err := r.updateStatefulSetOwner(instance); err != nil {
+	if err := r.updateStatefulSetOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update deployments owner")
 		return err
 	}
-	if err := r.updateConfigMapOwner(instance); err != nil {
+	if err := r.updateConfigMapOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update config map owner")
 		return err
 	}
-	if err := r.updateSecretsOwner(instance); err != nil {
+	if err := r.updateSecretsOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update secrets owner")
 		return err
 	}
-	if err := r.updatePvcOwner(instance); err != nil {
+	if err := r.updatePvcOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update pvc owner")
 		return err
 	}
-	if err := r.updateCronJobOwner(instance); err != nil {
+	if err := r.updateCronJobOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update cronjob owner")
 		return err
 	}
-	if err := r.updateServiceAccountOwner(instance); err != nil {
+	if err := r.updateServiceAccountOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update service account owner")
 		return err
 	}
-	if err := r.updateRoleOwner(instance); err != nil {
+	if err := r.updateRoleOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update role owner")
 		return err
 	}
-	if err := r.updateRoleBindingOwner(instance); err != nil {
+	if err := r.updateRoleBindingOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update role binding owner")
 		return err
 	}
-	if err := r.updateNetworkPolicyOwner(instance); err != nil {
+	if err := r.updateNetworkPolicyOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update network policy owner")
 		return err
 	}
-	if err := r.updateEngineOwner(instance); err != nil {
+	if err := r.updateIngressOwner(reqLogger, instance); err != nil {
+		reqLogger.Error(err, "cannot update ingress owner")
+		return err
+	}
+	if err := r.updateEngineOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update Engine owner")
 		return err
 	}
@@ -71,211 +75,331 @@ func (r *ReconcileQliksense) updateResourceOwner(reqLogger logr.Logger, instance
 	return nil
 }
 
-func (r *ReconcileQliksense) updateServiceOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateServiceOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.ServiceList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, svc := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range svc.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &svc, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &svc); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for service [ " + svc.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateDeploymentOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateDeploymentOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &appsv1.DeploymentList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, dep := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range dep.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &dep, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &dep); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for deployment [ " + dep.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateStatefulSetOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateStatefulSetOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &appsv1.StatefulSetList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, dep := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range dep.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &dep, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &dep); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for statefulset [ " + dep.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateIngressOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateIngressOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &v1beta1.IngressList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, ing := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range ing.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &ing, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &ing); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for Ingress [ " + ing.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateConfigMapOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateConfigMapOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.ConfigMapList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for ConfigMap [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateSecretsOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateSecretsOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.SecretList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for Secrets [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updatePvcOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updatePvcOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.PersistentVolumeClaimList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
-
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for pvc [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateCronJobOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateCronJobOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &batch_v1beta1.CronJobList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for CronJob [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateServiceAccountOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateServiceAccountOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &corev1.ServiceAccountList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for ServiceAccount [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateRoleOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateRoleOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &rbacv1.RoleList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for Role [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateRoleBindingOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateRoleBindingOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &rbacv1.RoleBindingList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
-		//fmt.Println(svc.Name)
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
 		}
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for RoleBinding [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateNetworkPolicyOwner(q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateNetworkPolicyOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
 	listObj := &v1beta1.NetworkPolicyList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
 	for _, cm := range listObj.Items {
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
 		//fmt.Println(svc.Name)
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
@@ -283,11 +407,13 @@ func (r *ReconcileQliksense) updateNetworkPolicyOwner(q *qlikv1.Qliksense) error
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
+		reqLogger.Info("update owner for NetworkPolicy [ " + cm.Name + " ]")
 	}
 	return nil
 }
 
-func (r *ReconcileQliksense) updateEngineOwner(q *qlikv1.Qliksense) error {
+// TODO: use dynamic client for all other standard resources, so that only one method can be used
+func (r *ReconcileQliksense) updateEngineOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -314,11 +440,22 @@ func (r *ReconcileQliksense) updateEngineOwner(q *qlikv1.Qliksense) error {
 			return err
 		}
 		if rls == q.Name {
+			alreadySet := false
+			for _, or := range d.GetOwnerReferences() {
+				if or.Name == q.GetName() {
+					alreadySet = true
+					break
+				}
+			}
+			if alreadySet {
+				continue
+			}
 			d.SetOwnerReferences([]metav1.OwnerReference{ref})
 			if _, updateErr := dynamicClient.Resource(engineRes).Namespace(q.Namespace).Update(&d, metav1.UpdateOptions{}); updateErr != nil {
 				return err
 			}
 		}
+		reqLogger.Info("update owner for Engine [ " + d.GetName() + " ]")
 	}
 	return nil
 }

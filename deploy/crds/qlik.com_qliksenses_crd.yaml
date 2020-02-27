@@ -8,6 +8,8 @@ spec:
     kind: Qliksense
     listKind: QliksenseList
     plural: qliksenses
+    shortNames:
+    - qs
     singular: qliksense
   scope: Namespaced
   subresources:
@@ -29,7 +31,10 @@ spec:
         metadata:
           type: object
         spec:
-          description: QliksenseSpec defines the desired state of Qliksense
+          description: CRSpec defines the configuration for the whole manifests It
+            is expecting in the manifestsRoot folder two subfolders .operator and
+            .configuration exist operator will add patch into .operator folder customer
+            will add patch into .configuration folder
           properties:
             configs:
               additionalProperties:
@@ -40,9 +45,23 @@ spec:
                       type: string
                     value:
                       type: string
+                    valueFrom:
+                      properties:
+                        secretKeyRef:
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - secretKeyRef
+                      type: object
                   required:
                   - name
-                  - value
                   type: object
                 type: array
               type: object
@@ -81,9 +100,23 @@ spec:
                       type: string
                     value:
                       type: string
+                    valueFrom:
+                      properties:
+                        secretKeyRef:
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - secretKeyRef
+                      type: object
                   required:
                   - name
-                  - value
                   type: object
                 type: array
               type: object

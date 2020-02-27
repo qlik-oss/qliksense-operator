@@ -4,15 +4,19 @@ go 1.13
 
 require (
 	github.com/go-logr/logr v0.1.0
+	github.com/google/uuid v1.1.1
+	github.com/mitchellh/go-homedir v1.1.0
 	github.com/operator-framework/operator-sdk v0.15.1
-	github.com/qlik-oss/k-apis v0.0.8
+	github.com/qlik-oss/k-apis v0.0.11
 
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 	sigs.k8s.io/controller-runtime v0.4.0
+	sigs.k8s.io/kustomize/api v0.3.2
 )
 
 // Pinned to kubernetes-1.16.2
@@ -38,7 +42,10 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.0.0-20191016115753-cf0698c3a16b
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20191016113814-3b1a734dba6e
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20191016112829-06bb3c9d77c9
+	sigs.k8s.io/kustomize/api => github.com/qlik-oss/kustomize/api v0.3.3-0.20200206224201-2e697eccbad9
 )
+
+exclude github.com/Azure/go-autorest v12.0.0+incompatible
 
 replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm
 

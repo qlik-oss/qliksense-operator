@@ -2,25 +2,27 @@ package qliksense
 
 import (
 	"context"
-	_ "fmt"
+
 	"github.com/go-logr/logr"
+	kapi_config "github.com/qlik-oss/k-apis/pkg/config"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -45,7 +47,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileQliksense{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileQliksense{client: mgr.GetClient(), scheme: mgr.GetScheme(), qlikInstances: NewQIs()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -67,6 +69,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -74,6 +81,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -81,6 +93,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -88,6 +105,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &corev1.ServiceAccount{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -95,6 +117,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &corev1.PersistentVolumeClaim{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -102,6 +129,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -109,6 +141,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -116,6 +153,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &v1beta1.Ingress{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -124,6 +166,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &batch_v1beta1.CronJob{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -131,6 +178,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &rbacv1.Role{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
@@ -138,10 +190,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &rbacv1.RoleBinding{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &qlikv1.Qliksense{},
+	}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
+		},
 	})
 	if err != nil {
 		return err
 	}
+
+	//cannot watch engine resources. because we dont know the type yet
 	return nil
 }
 
@@ -152,8 +211,9 @@ var _ reconcile.Reconciler = &ReconcileQliksense{}
 type ReconcileQliksense struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
+	client        client.Client
+	scheme        *runtime.Scheme
+	qlikInstances *QliksenseInstances
 }
 
 // Reconcile reads that state of the cluster for a Qliksense object and makes changes based on the state read
@@ -166,6 +226,7 @@ type ReconcileQliksense struct {
 func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Qliksense")
+
 	// Fetch the Qliksense instance
 	instance := &qlikv1.Qliksense{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
@@ -179,22 +240,10 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	/*
-		// keep this for debugging pupose
-		if b, err := yaml.Marshal(instance); err != nil {
-			reqLogger.Error(err, "cannot marshal qliksense CR")
-		} else {
-			fmt.Println(string(b))
-		}
-	*/
-	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
-		return reconcile.Result{}, err
-	}
-	reqLogger.Info("owner reference has been updated")
 
 	// Check if the qliksense instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
-	/*isQliksenseMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
+	isQliksenseMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
 	if isQliksenseMarkedToBeDeleted {
 		if contains(instance.GetFinalizers(), qliksenseFinalizer) {
 			// Run finalization logic for qliksenseFinalizer. If the
@@ -214,14 +263,45 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		}
 		return reconcile.Result{}, nil
 	}
+
+	// keep this for debugging pupose
+	/*	if b, err := yaml.Marshal(instance); err != nil {
+			reqLogger.Error(err, "cannot marshal qliksense CR")
+		} else {
+			fmt.Println(string(b))
+		}
 	*/
+
+	// if no git then it was a CLI deployed k8 resources
+	if (kapi_config.Repo{}) != instance.Spec.Git {
+		if err := r.qlikInstances.AddToQliksenseInstances(instance); err != nil {
+			reqLogger.Error(err, "Cannot create qliksense object")
+			return reconcile.Result{}, nil
+		}
+		if !r.qlikInstances.IsInstalled(instance.GetName()) {
+			// new install
+			if err := r.qlikInstances.installQliksene(instance.GetName()); err != nil {
+				reqLogger.Error(err, "Cannot create kubernetes resoruces for "+instance.GetName())
+				return reconcile.Result{}, err
+			}
+			// next time jwt keys will not be updated
+			instance.Spec.RotateKeys = "no"
+		}
+
+	}
+	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	//reqLogger.Info("owner reference has been updated")
+
 	// Add finalizer for this CR
-	/*if !contains(instance.GetFinalizers(), qliksenseFinalizer) {
+	if !contains(instance.GetFinalizers(), qliksenseFinalizer) {
 		if err := r.addFinalizer(reqLogger, instance); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
-	*/
+
 	return reconcile.Result{}, nil
 }
 
@@ -230,22 +310,26 @@ func (r *ReconcileQliksense) finalizeQliksense(reqLogger logr.Logger, qlik *qlik
 	// needs to do before the CR can be deleted. Examples
 	// of finalizers include performing backups and deleting
 	// resources that are not owned by this CR, like a PVC.
-	if err := r.client.DeleteAllOf(context.TODO(), &corev1.Service{}, client.MatchingLabels{searchingLabel: qlik.Name}); err != nil {
-		reqLogger.Error(err, "Cannot delete service")
-		return nil
+	// if err := r.client.DeleteAllOf(context.TODO(), &corev1.Service{}, client.MatchingLabels{searchingLabel: qlik.Name}); err != nil {
+	// 	reqLogger.Error(err, "Cannot delete service")
+	// 	return nil
+	// }
+	if err := r.qlikInstances.RemoveFromQliksenseInstances(qlik.GetName()); err != nil {
+		reqLogger.Error(err, "cannot remove "+qlik.GetName()+" from instances")
+	} else {
+		reqLogger.Info("Successfully finalized " + qlik.GetName())
 	}
-	reqLogger.Info("Successfully finalized memcached")
 	return nil
 }
 
 func (r *ReconcileQliksense) addFinalizer(reqLogger logr.Logger, m *qlikv1.Qliksense) error {
-	reqLogger.Info("Adding Finalizer for the Memcached")
+	reqLogger.Info("Adding Finalizer for the " + m.GetName())
 	m.SetFinalizers(append(m.GetFinalizers(), qliksenseFinalizer))
 
 	// Update CR
 	err := r.client.Update(context.TODO(), m)
 	if err != nil {
-		reqLogger.Error(err, "Failed to update Memcached with finalizer")
+		reqLogger.Error(err, "Failed to update qliksense with finalizer")
 		return err
 	}
 	return nil
