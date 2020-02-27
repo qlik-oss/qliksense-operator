@@ -8,9 +8,9 @@ spec:
     kind: Qliksense
     listKind: QliksenseList
     plural: qliksenses
-    singular: qliksense
     shortNames:
     - qs
+    singular: qliksense
   scope: Namespaced
   subresources:
     status: {}
@@ -45,9 +45,23 @@ spec:
                       type: string
                     value:
                       type: string
+                    valueFrom:
+                      properties:
+                        secretKeyRef:
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - secretKeyRef
+                      type: object
                   required:
                   - name
-                  - value
                   type: object
                 type: array
               type: object
@@ -86,9 +100,23 @@ spec:
                       type: string
                     value:
                       type: string
+                    valueFrom:
+                      properties:
+                        secretKeyRef:
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - secretKeyRef
+                      type: object
                   required:
                   - name
-                  - value
                   type: object
                 type: array
               type: object

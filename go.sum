@@ -785,6 +785,8 @@ github.com/qlik-oss/k-apis v0.0.9 h1:JWeHNsFepdrXgCs9UPmaEJYkpRhfMSXciHurE1aAmx8
 github.com/qlik-oss/k-apis v0.0.9/go.mod h1:KOFzKVIdRqp47ytnHg3+9zb8fTlnrQjO6aKiwcrCJUE=
 github.com/qlik-oss/k-apis v0.0.10 h1:nHzOXA0PR8sqESCEnnsYTFyp6nTkpr7HPDqK6Au2on8=
 github.com/qlik-oss/k-apis v0.0.10/go.mod h1:KOFzKVIdRqp47ytnHg3+9zb8fTlnrQjO6aKiwcrCJUE=
+github.com/qlik-oss/k-apis v0.0.11 h1:dhbcH1+8r14OMlTSrP2RAlr+707QXcrj1iVnA/y9r5I=
+github.com/qlik-oss/k-apis v0.0.11/go.mod h1:KOFzKVIdRqp47ytnHg3+9zb8fTlnrQjO6aKiwcrCJUE=
 github.com/qlik-oss/kustomize/api v0.3.3-0.20200206224201-2e697eccbad9 h1:iqeqTS4zjp6rPEaxmFB7pemA2CMjOEN5dYSXZaQ82uw=
 github.com/qlik-oss/kustomize/api v0.3.3-0.20200206224201-2e697eccbad9/go.mod h1:OCt7FTrRVHj4kmR2xLJJUIqu00BTr6GeF09hSmM17Kw=
 github.com/qlik-oss/qliksense-operator v0.2.1/go.mod h1:mUhrwQsngYOnvjUSuZEqCU1wPSrMhFIidXQdF9BB3Vc=

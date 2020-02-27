@@ -2,20 +2,21 @@ package qliksense
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
+	kapi_config "github.com/qlik-oss/k-apis/pkg/config"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -272,7 +273,7 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 	*/
 
 	// if no git then it was a CLI deployed k8 resources
-	if &instance.Spec.Git != nil {
+	if (kapi_config.Repo{}) != instance.Spec.Git {
 		if err := r.qlikInstances.AddToQliksenseInstances(instance); err != nil {
 			reqLogger.Error(err, "Cannot create qliksense object")
 			return reconcile.Result{}, nil
