@@ -52,7 +52,6 @@ spec:
     qliksense:
     - name: acceptEULA
       value: "yes"
-  manifestsRoot: /Users/mqb/learning/qliksense-k8s
   rotateKeys: "yes"
   releaseName: qlik-default
 ```
