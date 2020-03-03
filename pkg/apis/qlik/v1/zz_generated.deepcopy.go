@@ -13,7 +13,10 @@ func (in *Qliksense) DeepCopyInto(out *Qliksense) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.Spec.DeepCopyInto(&out.Spec)
+	if in.Spec != nil {
+		in, out := &in.Spec, &out.Spec
+		*out = (*in).DeepCopy()
+	}
 	out.Status = in.Status
 	return
 }

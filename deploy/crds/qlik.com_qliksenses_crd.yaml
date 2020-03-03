@@ -82,12 +82,8 @@ spec:
               type: object
             manifestsRoot:
               type: string
-            namespace:
-              type: string
             profile:
               description: relative to manifestsRoot folder, ex. ./manifests/base
-              type: string
-            releaseName:
               type: string
             rotateKeys:
               type: string

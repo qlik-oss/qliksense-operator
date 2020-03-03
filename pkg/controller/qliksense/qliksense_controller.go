@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	kapi_config "github.com/qlik-oss/k-apis/pkg/config"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
@@ -273,14 +272,14 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 	*/
 
 	// if no git then it was a CLI deployed k8 resources
-	if (kapi_config.Repo{}) != instance.Spec.Git {
+	if instance.Spec.Git != nil && instance.Spec.Git.Repository != "" {
 		if err := r.qlikInstances.AddToQliksenseInstances(instance); err != nil {
 			reqLogger.Error(err, "Cannot create qliksense object")
 			return reconcile.Result{}, nil
 		}
 		if !r.qlikInstances.IsInstalled(instance.GetName()) {
 			// new install
-			if err := r.qlikInstances.installQliksene(instance.GetName()); err != nil {
+			if err := r.qlikInstances.installQliksene(instance); err != nil {
 				reqLogger.Error(err, "Cannot create kubernetes resoruces for "+instance.GetName())
 				return reconcile.Result{}, err
 			}

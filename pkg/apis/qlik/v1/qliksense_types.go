@@ -32,7 +32,7 @@ type Qliksense struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   kapis.CRSpec    `json:"spec,omitempty"`
+	Spec   *kapis.CRSpec   `json:"spec,omitempty"`
 	Status QliksenseStatus `json:"status,omitempty"`
 }
 
