@@ -13,10 +13,14 @@ jobs:
     steps:
       - run:
           name: build qliksense operator
-          command: operator-sdk build qlik/qliksense-operator:v0.0.1
-  - docker-publish/publish:
-    image: qlik/qliksense-operator
-    tag: v1
+          command: operator-sdk build qlik/qliksense-operator:{CIRCLE_TAG}
+  docker-push:
+    docker:
+      - image: qlik/qliksense-operator
+    steps:
+      - run:
+          name: docker push         
+          command: docker push qlik/qliksense-operator:{CIRCLE_TAG}
 workflows:
   version: 2
   workflow:
@@ -28,7 +32,7 @@ workflows:
       - build-operator:
           requires:
           - build
-      - docker-publish/publish:
+      - docker-push:
           requires:
           - build-operator
 
