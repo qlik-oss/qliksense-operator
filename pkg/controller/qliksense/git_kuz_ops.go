@@ -2,6 +2,12 @@ package qliksense
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
+
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	kapis_config "github.com/qlik-oss/k-apis/pkg/config"
@@ -9,16 +15,10 @@ import (
 	_ "github.com/qlik-oss/k-apis/pkg/git"
 	kapis_git "github.com/qlik-oss/k-apis/pkg/git"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
-	"gopkg.in/yaml.v2"
-	"io"
-	"io/ioutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/konfig"
@@ -43,7 +43,7 @@ func NewQIs() *QliksenseInstances {
 }
 func (qi *QliksenseInstances) AddToQliksenseInstances(qs *qlikv1.Qliksense) error {
 	qi.InstanceMap[qs.GetName()] = qs
-	if manifestRoot, err := cloneGitRepo(qs.GetName(), qs.GetVersion(), &qs.Spec.Git); err != nil {
+	if manifestRoot, err := cloneGitRepo(qs.GetName(), qs.GetVersion(), qs.Spec.Git); err != nil {
 		return err
 	} else {
 		qs.Spec.ManifestsRoot = manifestRoot
@@ -68,7 +68,7 @@ func (qi *QliksenseInstances) RemoveFromQliksenseInstances(crName string) error 
 
 func (qi *QliksenseInstances) GetCRSpec(crName string) *kapis_config.CRSpec {
 	q := qi.InstanceMap[crName]
-	return &q.Spec
+	return q.Spec
 }
 
 // clone the git repo and checking out a branch out of it
@@ -176,16 +176,10 @@ func executeKustomizeBuild(directory string) ([]byte, error) {
 	return resMap.AsYaml()
 }
 
-func (qi *QliksenseInstances) installQliksene(crName string) error {
-	crspec := qi.GetCRSpec(crName)
-	// keep this for debugging pupose
-	if b, err := yaml.Marshal(crspec); err != nil {
-		getKuzLogger().Error(err, "cannot marshal qliksense CR Spec")
-
-	} else {
-		getKuzLogger().Info(string(b))
-	}
-
+func (qi *QliksenseInstances) installQliksene(qse *qlikv1.Qliksense) error {
+	mfestRoot := qi.ManifestRootMap[qse.GetName()]
+	qse.Spec.ManifestsRoot = mfestRoot
+	kcr := convertToKApiCr(qse)
 	// generate patches
 	// empty string should use in-cluster config
 	dirName, _ := ioutil.TempDir("", "")
@@ -193,9 +187,9 @@ func (qi *QliksenseInstances) installQliksene(crName string) error {
 		getKuzLogger().Error(err, "cannot set env for EJSON_KEYDIR")
 	}
 	getKuzLogger().Info("generating kustomize patches by k-api")
-	kapis_cr.GeneratePatches(crspec, "")
-	getKuzLogger().Info("executing kustomize build in folder " + filepath.Join(crspec.GetManifestsRoot(), crspec.GetProfileDir()))
-	qInitByte, err := executeKustomizeBuild(filepath.Join(crspec.GetManifestsRoot(), crspec.GetProfileDir()))
+	kapis_cr.GeneratePatches(kcr, "")
+	getKuzLogger().Info("executing kustomize build in folder " + filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
+	qInitByte, err := executeKustomizeBuild(filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
 	if err != nil {
 		return err
 	}
@@ -239,4 +233,12 @@ func kubectlOperation(manifests string, oprName string) error {
 	}
 	os.Remove(tempYaml.Name())
 	return nil
+}
+
+func convertToKApiCr(qse *qlikv1.Qliksense) *kapis_config.KApiCr {
+	return &kapis_config.KApiCr{
+		TypeMeta:   qse.TypeMeta,
+		ObjectMeta: qse.ObjectMeta,
+		Spec:       qse.Spec,
+	}
 }
