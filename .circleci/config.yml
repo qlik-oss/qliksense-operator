@@ -3,6 +3,7 @@ jobs:
   build-operator:
     docker:
       - image: thebeansgroup/operator-sdk-runner
+    working_directory: /go/src/github.com/qlik-oss/qliksense-operator
     steps:
       - run:
           name: build qliksense operator
