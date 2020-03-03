@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   build-operator:
     docker:
-      - image: qlik/qliksense-operator
+      - image: thebeansgroup/operator-sdk-runner
     steps:
       - run:
           name: build qliksense operator
@@ -17,7 +17,7 @@ jobs:
 workflows:
   version: 2
   workflow:
-    jobs:
+    jobs: 
       - build-operator:
           filters:
             tags:
@@ -25,19 +25,6 @@ workflows:
       - docker-push:
           requires:
           - build-operator
-
-# build:
-#     docker: 
-#       - image: qlik/qliksense-operator
-#     steps:
-#       - run:
-#           name: install operator-sdk
-#           command: brew install operator-sdk
-
-
-
-
-
 
 # Golang CircleCI 2.0 configuration file
 #
