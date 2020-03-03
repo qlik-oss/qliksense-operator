@@ -2,12 +2,39 @@
 version: 2.1
 orbs:
   docker-publish: circleci/docker-publish@0.1.7
+jobs:
+  install-operator:
+    docker: 
+      - image: qlik/qliksense-operator
+    steps:
+      - run:
+          name: install operator-sdk
+          command: brew install operator-sdk
+  build-operator:
+    docker:
+      - image: qlik/qliksense-operator
+    steps:
+      - run:
+          name: build qliksense operator
+          command: operator-sdk build qlik/qliksense-operator:v0.0.1
+  - docker-publish/publish:
+    image: qlik/qliksense-operator
+    tag: v1
 workflows:
-  build_and_publish_docker_image:
+  version: 2
+  workflow:
     jobs:
+      - install-operator:
+          filters:
+            tags:
+              only: /.*/
+      - build-operator:
+          requires:
+          - install-operator
       - docker-publish/publish:
-          image: qlik/qliksense-operator
-          tag: v1
+          requires:
+          - build-operator
+
 # Golang CircleCI 2.0 configuration file
 #
 # Check https://circleci.com/docs/2.0/language-go/ for more details
