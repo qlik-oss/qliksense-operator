@@ -1,6 +1,6 @@
 version: 2.1
 jobs:
-  build:
+  build-operator:
     docker:
       - image: qlik/qliksense-operator
     steps:
@@ -18,9 +18,7 @@ workflows:
   version: 2
   workflow:
     jobs:
-      - build:
-          requires:
-          - build
+      - build-operator:
           filters:
             tags:
               only: /.*/
