@@ -3,7 +3,7 @@ version: 2.1
 orbs:
   docker-publish: circleci/docker-publish@0.1.7
 jobs:
-  install-operator:
+  build:
     docker: 
       - image: qlik/qliksense-operator
     steps:
@@ -24,13 +24,13 @@ workflows:
   version: 2
   workflow:
     jobs:
-      - install-operator:
+      - build:
           filters:
             tags:
               only: /.*/
       - build-operator:
           requires:
-          - install-operator
+          - build
       - docker-publish/publish:
           requires:
           - build-operator
