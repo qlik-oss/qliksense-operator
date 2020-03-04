@@ -26,9 +26,6 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - docker-publish/publish:
-          image: qlik/qliksense-operator
-          tag: {CIRCLE_TAG}
 # version: 2.1
 # orbs:
 #   docker-publish: circleci/docker-publish@0.1.7
