@@ -17,7 +17,7 @@ jobs:
     steps:
       - run:
           name: docker push         
-          command: docker push qlik/qliksense-operator:{CIRCLE_TAG}
+          command: docker push qlik/qliksense-operator:${CIRCLE_TAG}
 workflows:
   version: 2
   workflow:
