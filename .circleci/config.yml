@@ -13,7 +13,7 @@ jobs:
       - run: operator-sdk build qlik/qliksense-operator
   docker-push:
     docker:
-      - image: qlik/qliksense-operator
+      - image: circleci/golang:stretch
     steps:
       - run:
           name: docker push         
