@@ -10,14 +10,14 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: curl -Lo operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v0.15.2/operator-sdk-v0.15.2-x86_64-linux-gnu && chmod +x operator-sdk && sudo mv operator-sdk /usr/local/bin/
-      - run: operator-sdk build qlik/qliksense-operator:{{CIRCLE_TAG}}
+      - run: operator-sdk build qlik/qliksense-operator
   docker-push:
     docker:
       - image: circleci/golang:stretch
     steps:
       - run:
           name: docker push         
-          command: docker push qlik/qliksense-operator:{{CIRCLE_TAG}}
+          command: docker push qlik/qliksense-operator
 workflows:
   version: 2
   workflow:
