@@ -26,9 +26,6 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - docker-push:
-          requires:
-          - build
       - docker-publish/publish:
           image: qlik/qliksense-operator
           tag: {CIRCLE_TAG}
