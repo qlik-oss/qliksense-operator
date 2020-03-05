@@ -414,7 +414,6 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 										Value: string(b),
 									},
 								},
-								Args: []string{"env"},
 							}},
 							RestartPolicy: "OnFailure",
 						},
