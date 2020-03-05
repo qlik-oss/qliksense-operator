@@ -80,7 +80,7 @@ spec:
               properties:
                 enabled:
                   type: string
-                imageTag:
+                image:
                   type: string
                 schedule:
                   type: string

@@ -53,7 +53,7 @@ type GitOpsMeta struct {
 	Enabled     string `json:"enabled"`
 	Schedule    string `json:"schedule,omitempty"`
 	WatchBranch string `json:"watchBranch,omitempty"`
-	ImageTag    string `json:"imageTag,omitempty"`
+	Image       string `json:"image,omitempty"`
 }
 
 func init() {

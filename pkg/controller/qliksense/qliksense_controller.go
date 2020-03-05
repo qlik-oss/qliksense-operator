@@ -406,7 +406,7 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{
-								Image: m.Spec.GitOps.ImageTag,
+								Image: m.Spec.GitOps.Image,
 								Name:  m.Name + "-poorman-gitops",
 								Env: []corev1.EnvVar{
 									{
