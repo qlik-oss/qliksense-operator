@@ -7,16 +7,19 @@ import (
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
+	batch_v1 "k8s.io/api/batch/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	_ "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -285,6 +288,12 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 			}
 			// next time jwt keys will not be updated
 			instance.Spec.RotateKeys = "no"
+			//setup cronjob to monitor the repo for git ops
+			if instance.Spec.GitOps != nil && instance.Spec.GitOps.Enabled == "yes" {
+				if err := r.setupCronJob(reqLogger, instance); err != nil {
+					return reconcile.Result{}, err
+				}
+			}
 		}
 
 	}
@@ -350,4 +359,70 @@ func remove(list []string, s string) []string {
 		}
 	}
 	return list
+}
+
+func (r *ReconcileQliksense) setupCronJob(reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+
+	// Check if the Job already exists if not create one
+	found := &batch_v1beta1.CronJob{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: m.Name, Namespace: m.Namespace}, found)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new Job
+		job, err := r.cronJobForGitOps(reqLogger, m)
+		if err != nil {
+			return err
+		}
+		reqLogger.Info("Creating a new CronJob", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
+
+		err = r.client.Create(context.TODO(), job)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create new CronJob", "CronJob.Namespace", job.Namespace, "Job.Name", job.Name)
+			return err
+		}
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to get CronJob")
+		return err
+	}
+	// Job already exists - don't requeue
+	reqLogger.Info("Skip reconcile: CronJob already exists", "CronJob.Namespace", found.Namespace, "CronJob.Name", found.Name)
+	return nil
+}
+
+// jobForExecutor returns a QseokExecutor Job object
+func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Qliksense) (*batch_v1beta1.CronJob, error) {
+	b, err := K8sToYaml(m)
+	if err != nil {
+		return nil, err
+	}
+	cronJob := &batch_v1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name + "-poorman-gitops",
+			Namespace: m.Namespace,
+		},
+		Spec: batch_v1beta1.CronJobSpec{
+			Schedule: m.Spec.GitOps.Schedule,
+			JobTemplate: batch_v1beta1.JobTemplateSpec{
+				Spec: batch_v1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Image: m.Spec.GitOps.Image,
+								Name:  m.Name + "-poorman-gitops",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "YAML_CONF",
+										Value: string(b),
+									},
+								},
+							}},
+							RestartPolicy: "OnFailure",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	controllerutil.SetControllerReference(m, cronJob, r.scheme)
+	return cronJob, nil
 }

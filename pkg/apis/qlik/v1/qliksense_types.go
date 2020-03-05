@@ -32,7 +32,7 @@ type Qliksense struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   *kapis.CRSpec   `json:"spec,omitempty"`
+	Spec   *CombinedSpec   `json:"spec,omitempty"`
 	Status QliksenseStatus `json:"status,omitempty"`
 }
 
@@ -43,6 +43,17 @@ type QliksenseList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Qliksense `json:"items"`
+}
+
+type CombinedSpec struct {
+	*kapis.CRSpec `json:",inline"`
+	GitOps        *GitOpsMeta `json:"gitOps,omitempty"`
+}
+type GitOpsMeta struct {
+	Enabled     string `json:"enabled"`
+	Schedule    string `json:"schedule,omitempty"`
+	WatchBranch string `json:"watchBranch,omitempty"`
+	Image       string `json:"image,omitempty"`
 }
 
 func init() {

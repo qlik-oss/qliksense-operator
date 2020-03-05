@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -66,7 +67,7 @@ func (qi *QliksenseInstances) RemoveFromQliksenseInstances(crName string) error 
 	return nil
 }
 
-func (qi *QliksenseInstances) GetCRSpec(crName string) *kapis_config.CRSpec {
+func (qi *QliksenseInstances) GetCRSpec(crName string) *qlikv1.CombinedSpec {
 	q := qi.InstanceMap[crName]
 	return q.Spec
 }
@@ -239,6 +240,18 @@ func convertToKApiCr(qse *qlikv1.Qliksense) *kapis_config.KApiCr {
 	return &kapis_config.KApiCr{
 		TypeMeta:   qse.TypeMeta,
 		ObjectMeta: qse.ObjectMeta,
-		Spec:       qse.Spec,
+		Spec:       qse.Spec.CRSpec,
+	}
+}
+
+func K8sToYaml(k8sObj interface{}) ([]byte, error) {
+	k8sSecretYamlMap := map[string]interface{}{}
+	if k8sSecretYamlBytes, err := yaml.Marshal(k8sObj); err != nil {
+		return nil, err
+	} else if err := yaml.Unmarshal(k8sSecretYamlBytes, &k8sSecretYamlMap); err != nil {
+		return nil, err
+	} else {
+		delete(k8sSecretYamlMap["metadata"].(map[string]interface{}), "creationTimestamp")
+		return yaml.Marshal(k8sSecretYamlMap)
 	}
 }
