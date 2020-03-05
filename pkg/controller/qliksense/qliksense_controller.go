@@ -396,7 +396,7 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 	}
 	cronJob := &batch_v1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name,
+			Name:      m.Name + "-poorman-gitops",
 			Namespace: m.Namespace,
 		},
 		Spec: batch_v1beta1.CronJobSpec{
