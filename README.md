@@ -27,7 +27,6 @@ spec:
       value: "yes"
   manifestsRoot: /Users/mqb/learning/qliksense-k8s
   rotateKeys: "yes"
-  releaseName: qlik-default
 ```
 
 After installing QSEoK by [sense-installer](https://github.com/qlik-oss/sense-installer) it will create the above CR. Then operator take the owner ship of all the resoruces for QSEoK. So that operator can delete/manage QSEoK resources. This provides the flexibility for customer to switch to git-ops mode by providing the following CR without any service outage
@@ -53,9 +52,37 @@ spec:
     - name: acceptEULA
       value: "yes"
   rotateKeys: "yes"
-  releaseName: qlik-default
 ```
 
 ## Light-Weight git-ops
 
-Having git repo in the CR, the operator can install QSEoK and initiate a cronjob to watch master branch of the repo. Any changes make into the master branch the cron job will apply those changes into the cluster.
+Having git repo in the CR, the operator can install QSEoK and initiate a cronjob to watch master branch of the repo. Any changes make into the master branch the cron job will apply those changes into the cluster. To enable the light-weight git-ops the CR need to be like this. When the operator creates the cron job from following spec, it pass the whole CR as an environment vairable `YAML_CONF`. The cronjob container should have a startup script which reads the `YAML_CONF` and perform gitops stuff.
+
+```yaml
+apiVersion: qlik.com/v1
+kind: Qliksense
+metadata:
+  name: qlik-default
+  labels:
+    version: v0.0.2
+spec:
+  profile: docker-desktop
+  git:
+    repository: https://github.com/my-org/qliksense-k8s
+    accessToken: balallafafafaf
+  gitOps:
+    enabled: "yes"
+    schedule: "*/10 * * * *"
+    watchBranch: master
+    image: busybox # any image that will watch the repo and pull and apply those into cluster
+  secrets:
+    qliksense:
+    - name: mongoDbUri
+      value: mongodb://qlik-default-mongodb:27017/qliksense?ssl=false
+  configs:
+    qliksense:
+    - name: acceptEULA
+      value: "yes"
+  rotateKeys: "yes"
+
+```
