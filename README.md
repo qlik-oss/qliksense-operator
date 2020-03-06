@@ -56,7 +56,7 @@ spec:
 
 ## Light-Weight git-ops
 
-Having git repo in the CR, the operator can install QSEoK and initiate a cronjob to watch master branch of the repo. Any changes make into the master branch the cron job will apply those changes into the cluster. To enable the light-weight git-ops the CR need to be like this. When the operator creates the cron job from following spec, it pass the whole CR as an environment vairable `YAML_CONF`. The cronjob container should have a startup script which reads the `YAML_CONF` and perform gitops stuff.
+Having git repo in the CR, the operator can install QSEoK and initiate a cronjob to watch master branch of the repo. Any changes make into the master branch the cron job will apply those changes into the cluster. To enable the light-weight git-ops the CR need to be like this. When the operator creates the cron job from following spec, it pass the whole CR as an environment vairable `YAML_CONF`. The operator changes `rotateKeys:"yes"` to `rotateKeys="no"` so that subsequent apply does not change the JWT keys. The cronjob container should have a startup script which reads the `YAML_CONF` and perform gitops stuff.
 
 ```yaml
 apiVersion: qlik.com/v1
@@ -83,6 +83,6 @@ spec:
     qliksense:
     - name: acceptEULA
       value: "yes"
-  rotateKeys: "yes"
+  rotateKeys: "no"
 
 ```
