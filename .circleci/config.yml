@@ -11,7 +11,7 @@ jobs:
       - setup_remote_docker
       - run: curl -Lo operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v0.15.2/operator-sdk-v0.15.2-x86_64-linux-gnu && chmod +x operator-sdk && sudo mv operator-sdk /usr/local/bin/
       - run: operator-sdk build qlik/qliksense-operator
-      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run: docker login -u $DOCKER_LOGIN -p $DOCKER_PASSWORD
       - run: docker push qlik/qliksense-operator
 workflows:
   version: 2
