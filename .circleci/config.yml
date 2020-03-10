@@ -19,9 +19,9 @@ workflows:
     jobs: 
       - build:
           filters:
-            ignore: /.*/
             tags:
-              only: /^v.*/
+              ignore: /.*/
+              only: /v.*/
 
 
 # version: 2.1
