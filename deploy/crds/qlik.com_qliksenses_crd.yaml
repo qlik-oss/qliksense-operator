@@ -31,6 +31,10 @@ spec:
         metadata:
           type: object
         spec:
+          description: CRSpec defines the configuration for the whole manifests It
+            is expecting in the manifestsRoot folder two subfolders .operator and
+            .configuration exist operator will add patch into .operator folder customer
+            will add patch into .configuration folder
           properties:
             configs:
               additionalProperties:
@@ -86,8 +90,6 @@ spec:
                   type: string
                 watchBranch:
                   type: string
-              required:
-              - enabled
               type: object
             manifestsRoot:
               type: string
