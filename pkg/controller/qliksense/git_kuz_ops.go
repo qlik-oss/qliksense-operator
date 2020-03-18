@@ -67,7 +67,7 @@ func (qi *QliksenseInstances) RemoveFromQliksenseInstances(crName string) error 
 	return nil
 }
 
-func (qi *QliksenseInstances) GetCRSpec(crName string) *qlikv1.CombinedSpec {
+func (qi *QliksenseInstances) GetCRSpec(crName string) *kapis_config.CRSpec {
 	q := qi.InstanceMap[crName]
 	return q.Spec
 }
@@ -240,7 +240,7 @@ func convertToKApiCr(qse *qlikv1.Qliksense) *kapis_config.KApiCr {
 	return &kapis_config.KApiCr{
 		TypeMeta:   qse.TypeMeta,
 		ObjectMeta: qse.ObjectMeta,
-		Spec:       qse.Spec.CRSpec,
+		Spec:       qse.Spec,
 	}
 }
 

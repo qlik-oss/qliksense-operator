@@ -34,6 +34,7 @@ var log = logf.Log.WithName("controller_qliksense")
 const (
 	qliksenseFinalizer = "finalizer.qliksense.qlik.com"
 	searchingLabel     = "release"
+	gitOpsCJSuffix     = "-poorman-gitops"
 )
 
 /**
@@ -286,13 +287,12 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 				reqLogger.Error(err, "Cannot create kubernetes resoruces for "+instance.GetName())
 				return reconcile.Result{}, err
 			}
+		}
+		if instance.Spec.GitOps != nil {
 			// next time jwt keys will not be updated
 			instance.Spec.RotateKeys = "no"
-			//setup cronjob to monitor the repo for git ops
-			if instance.Spec.GitOps != nil && instance.Spec.GitOps.Enabled == "yes" {
-				if err := r.setupCronJob(reqLogger, instance); err != nil {
-					return reconcile.Result{}, err
-				}
+			if err := r.setupCronJob(reqLogger, instance); err != nil {
+				return reconcile.Result{}, err
 			}
 		}
 
@@ -361,12 +361,23 @@ func remove(list []string, s string) []string {
 	return list
 }
 
+// setupCronJob create a new cronjob if not exist, and delete the existing cronjob if enabled=no
 func (r *ReconcileQliksense) setupCronJob(reqLogger logr.Logger, m *qlikv1.Qliksense) error {
 
 	// Check if the Job already exists if not create one
-	found := &batch_v1beta1.CronJob{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: m.Name, Namespace: m.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
+	job := &batch_v1beta1.CronJob{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: m.Name + gitOpsCJSuffix, Namespace: m.Namespace}, job)
+	if err == nil && m.Spec.GitOps.Enabled != "yes" {
+		if err = r.client.Delete(context.TODO(), job); err != nil {
+			reqLogger.Error(err, "Failed to delete CronJob")
+			return err
+		}
+		reqLogger.Info("Cronjob has been deleted", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
+		return nil
+	} else if err != nil && errors.IsNotFound(err) {
+		if m.Spec.GitOps.Enabled != "yes" {
+			return nil
+		}
 		// Define a new Job
 		job, err := r.cronJobForGitOps(reqLogger, m)
 		if err != nil {
@@ -375,16 +386,22 @@ func (r *ReconcileQliksense) setupCronJob(reqLogger logr.Logger, m *qlikv1.Qliks
 		reqLogger.Info("Creating a new CronJob", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
 
 		err = r.client.Create(context.TODO(), job)
-		if err != nil {
+		if err != nil && !errors.IsAlreadyExists(err) {
 			reqLogger.Error(err, "Failed to create new CronJob", "CronJob.Namespace", job.Namespace, "Job.Name", job.Name)
 			return err
 		}
-	} else if err != nil {
+		if err != nil && errors.IsAlreadyExists(err) {
+			reqLogger.Info("CronJob already exist", "CronJob.Namespace", job.Namespace, "Job.Name", job.Name)
+		} else {
+			reqLogger.Info("CronJob has been created", "CronJob.Namespace", job.Namespace, "Job.Name", job.Name)
+		}
+	} else if err != nil && !errors.IsAlreadyExists(err) {
 		reqLogger.Error(err, "Failed to get CronJob")
 		return err
+	} else {
+		// Job already exists - don't requeue
+		reqLogger.Info("CronJob already exists", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
 	}
-	// Job already exists - don't requeue
-	reqLogger.Info("Skip reconcile: CronJob already exists", "CronJob.Namespace", found.Namespace, "CronJob.Name", found.Name)
 	return nil
 }
 
@@ -396,8 +413,11 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 	}
 	cronJob := &batch_v1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name + "-poorman-gitops",
+			Name:      m.Name + gitOpsCJSuffix,
 			Namespace: m.Namespace,
+			Labels: map[string]string{
+				"release": m.Name,
+			},
 		},
 		Spec: batch_v1beta1.CronJobSpec{
 			Schedule: m.Spec.GitOps.Schedule,
@@ -407,7 +427,7 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{
 								Image: m.Spec.GitOps.Image,
-								Name:  m.Name + "-poorman-gitops",
+								Name:  m.Name + gitOpsCJSuffix,
 								Env: []corev1.EnvVar{
 									{
 										Name:  "YAML_CONF",

@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/google/uuid v1.1.1
 	github.com/operator-framework/operator-sdk v0.15.1
-	github.com/qlik-oss/k-apis v0.0.14
+	github.com/qlik-oss/k-apis v0.0.21
 
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.8
