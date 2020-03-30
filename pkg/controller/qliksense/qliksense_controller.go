@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	operator_status "github.com/operator-framework/operator-sdk/pkg/status"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
@@ -244,6 +245,9 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
+	if !instance.Status.Conditions.IsTrueFor("Initialized") {
+		r.setCrStatus(reqLogger, instance, "Valid", "Initialized", "")
+	}
 	// Check if the qliksense instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
 	isQliksenseMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
@@ -294,10 +298,17 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 			if err := r.setupCronJob(reqLogger, instance); err != nil {
 				return reconcile.Result{}, err
 			}
+			r.setCrStatus(reqLogger, instance, "Valid", "GitOpsMode", "")
+		} else {
+			r.setCrStatus(reqLogger, instance, "Valid", "GitMode", "")
 		}
 
+	} else {
+		r.setCrStatus(reqLogger, instance, "Valid", "CliMode", "")
 	}
+
 	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
+		r.setCrStatus(reqLogger, instance, "Valid", "Error", err.Error())
 		return reconcile.Result{}, err
 	}
 
@@ -445,4 +456,19 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 
 	controllerutil.SetControllerReference(m, cronJob, r.scheme)
 	return cronJob, nil
+}
+
+func (r *ReconcileQliksense) setCrStatus(reqLogger logr.Logger, m *qlikv1.Qliksense, sts, tps, reason string) error {
+	var cond operator_status.Condition
+	cond = operator_status.Condition{
+		Type:   operator_status.ConditionType(tps),
+		Status: corev1.ConditionStatus(sts),
+	}
+
+	if reason != "" {
+		cond.Reason = operator_status.ConditionReason(reason)
+	}
+
+	m.Status.Conditions.SetCondition(cond)
+	return r.client.Status().Update(context.TODO(), m)
 }
