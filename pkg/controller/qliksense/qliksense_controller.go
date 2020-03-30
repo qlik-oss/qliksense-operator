@@ -306,7 +306,9 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 	} else {
 		r.setCrStatus(reqLogger, instance, "Valid", "CliMode", "")
 	}
+
 	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
+		r.setCrStatus(reqLogger, instance, "Valid", "Error", err.Error())
 		return reconcile.Result{}, err
 	}
 
