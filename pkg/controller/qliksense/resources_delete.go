@@ -120,6 +120,7 @@ func (r *ReconcileQliksense) deletePods(reqLogger logr.Logger, q *qlikv1.Qliksen
 		reqLogger.Error(err, "Cannot delete pods")
 		return nil
 	}
+	reqLogger.Info("Deleting Pods")
 	r.setCrStatus(reqLogger, q, "Valid", "DeletingPods", "User Initaited Action")
 	return nil
 }
