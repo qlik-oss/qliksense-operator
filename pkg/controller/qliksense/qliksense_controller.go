@@ -2,6 +2,8 @@ package qliksense
 
 import (
 	"context"
+	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
 	operator_status "github.com/operator-framework/operator-sdk/pkg/status"
@@ -33,9 +35,10 @@ import (
 var log = logf.Log.WithName("controller_qliksense")
 
 const (
-	qliksenseFinalizer = "finalizer.qliksense.qlik.com"
-	searchingLabel     = "release"
-	gitOpsCJSuffix     = "-poorman-gitops"
+	qliksenseFinalizer     = "finalizer.qliksense.qlik.com"
+	searchingLabel         = "release"
+	gitOpsCJSuffix         = "-poorman-gitops"
+	maxDeletionWaitSeconds = 180 // 3 minutes
 )
 
 /**
@@ -333,11 +336,46 @@ func (r *ReconcileQliksense) finalizeQliksense(reqLogger logr.Logger, qlik *qlik
 	// 	reqLogger.Error(err, "Cannot delete service")
 	// 	return nil
 	// }
+
 	if err := r.qlikInstances.RemoveFromQliksenseInstances(qlik.GetName()); err != nil {
 		reqLogger.Error(err, "cannot remove "+qlik.GetName()+" from instances")
 	} else {
-		reqLogger.Info("Successfully finalized " + qlik.GetName())
+
 	}
+	name := qlik.GetName()
+
+	if err := r.deleteDeployments(reqLogger, qlik); err != nil {
+		reqLogger.Error(err, "cannot delete deployments. Finalizing anyway")
+		return nil
+	}
+
+	if err := r.deleteStatefuleSet(reqLogger, qlik); err != nil {
+		reqLogger.Error(err, "cannot delete statefuleset. Finalizing anyway")
+		return nil
+	}
+	if err := r.deleteCronJob(reqLogger, qlik); err != nil {
+		reqLogger.Error(err, "cannot delete CronJob. Finalizing anyway")
+		return nil
+	}
+	if err := r.deleteJob(reqLogger, qlik); err != nil {
+		reqLogger.Error(err, "cannot delete Job. Finalizing anyway")
+		return nil
+	}
+	if err := r.deleteEngine(reqLogger, qlik); err != nil {
+		reqLogger.Error(err, "cannot delete Engine. Finalizing anyway")
+		return nil
+	}
+
+	waitTimeCounter := 0
+	for {
+		time.Sleep(5 * time.Second)
+		waitTimeCounter += 5
+		reqLogger.Info("Waiting to finish resource deletion: " + strconv.Itoa(waitTimeCounter) + " seconds")
+		if r.isAllPodsDeleted(reqLogger, qlik) || waitTimeCounter == maxDeletionWaitSeconds {
+			break
+		}
+	}
+	reqLogger.Info("Successfully finalized " + name)
 	return nil
 }
 
