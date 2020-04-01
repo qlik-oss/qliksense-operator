@@ -16,7 +16,7 @@ spec:
       containers:
         - name: qliksense-operator
           # Replace this with the built image name
-          image: qlik-docker-oss.bintray.io/qliksense-operator:v0.1.5
+          image: qlik-docker-oss.bintray.io/qliksense-operator:v0.1.6
           command:
           - qliksense-operator
           imagePullPolicy: Always
