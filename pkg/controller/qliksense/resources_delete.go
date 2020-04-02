@@ -20,7 +20,6 @@ func (r *ReconcileQliksense) deleteDeployments(reqLogger logr.Logger, q *qlikv1.
 	opts := []client.DeleteAllOfOption{
 		client.InNamespace(q.GetNamespace()),
 		client.MatchingLabels{searchingLabel: q.GetName()},
-		client.GracePeriodSeconds(1),
 	}
 	if err := r.client.DeleteAllOf(context.TODO(), &appsv1.Deployment{}, opts...); err != nil {
 		reqLogger.Error(err, "Cannot delete deployments")
@@ -35,7 +34,6 @@ func (r *ReconcileQliksense) deleteStatefuleSet(reqLogger logr.Logger, q *qlikv1
 	opts := []client.DeleteAllOfOption{
 		client.InNamespace(q.GetNamespace()),
 		client.MatchingLabels{searchingLabel: q.GetName()},
-		client.GracePeriodSeconds(1),
 	}
 	if err := r.client.DeleteAllOf(context.TODO(), &appsv1.StatefulSet{}, opts...); err != nil {
 		reqLogger.Error(err, "Cannot delete statefulset")
@@ -50,7 +48,6 @@ func (r *ReconcileQliksense) deleteCronJob(reqLogger logr.Logger, q *qlikv1.Qlik
 	opts := []client.DeleteAllOfOption{
 		client.InNamespace(q.GetNamespace()),
 		client.MatchingLabels{searchingLabel: q.GetName()},
-		client.GracePeriodSeconds(1),
 	}
 	if err := r.client.DeleteAllOf(context.TODO(), &batch_v1beta1.CronJob{}, opts...); err != nil {
 		reqLogger.Error(err, "Cannot delete cronjob")
@@ -65,7 +62,6 @@ func (r *ReconcileQliksense) deleteJob(reqLogger logr.Logger, q *qlikv1.Qliksens
 	opts := []client.DeleteAllOfOption{
 		client.InNamespace(q.GetNamespace()),
 		client.MatchingLabels{searchingLabel: q.GetName()},
-		client.GracePeriodSeconds(1),
 	}
 	if err := r.client.DeleteAllOf(context.TODO(), &batch_v1.Job{}, opts...); err != nil {
 		reqLogger.Error(err, "Cannot delete job")
@@ -114,12 +110,12 @@ func (r *ReconcileQliksense) deletePods(reqLogger logr.Logger, q *qlikv1.Qliksen
 	opts := []client.DeleteAllOfOption{
 		client.InNamespace(q.GetNamespace()),
 		client.MatchingLabels{searchingLabel: q.GetName()},
-		client.GracePeriodSeconds(1),
 	}
 	if err := r.client.DeleteAllOf(context.TODO(), &corev1.Pod{}, opts...); err != nil {
 		reqLogger.Error(err, "Cannot delete pods")
 		return nil
 	}
+	reqLogger.Info("Deleting Pods")
 	r.setCrStatus(reqLogger, q, "Valid", "DeletingPods", "User Initaited Action")
 	return nil
 }

@@ -38,7 +38,7 @@ const (
 	qliksenseFinalizer     = "finalizer.qliksense.qlik.com"
 	searchingLabel         = "release"
 	gitOpsCJSuffix         = "-poorman-gitops"
-	maxDeletionWaitSeconds = 180 // 3 minutes
+	maxDeletionWaitSeconds = 90 // 1.5 minutes
 )
 
 /**
@@ -366,10 +366,15 @@ func (r *ReconcileQliksense) finalizeQliksense(reqLogger logr.Logger, qlik *qlik
 		return nil
 	}
 
+	if err := r.deletePods(reqLogger, qlik); err != nil {
+		reqLogger.Error(err, "cannot delete pods. Finalizing anyway")
+		return nil
+	}
+
 	waitTimeCounter := 0
 	for {
-		time.Sleep(5 * time.Second)
-		waitTimeCounter += 5
+		time.Sleep(1 * time.Second)
+		waitTimeCounter += 1
 		reqLogger.Info("Waiting to finish resource deletion: " + strconv.Itoa(waitTimeCounter) + " seconds")
 		if r.isAllPodsDeleted(reqLogger, qlik) || waitTimeCounter == maxDeletionWaitSeconds {
 			break
