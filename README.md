@@ -5,10 +5,10 @@ qliksense-operator is used to manage QSEoK resources inside kubernetes cluster. 
 ## Operator Deployment
 
 Any Kubernetes operator has two parts 1. CRD 2. Controller. For qliksense operator, custom resource definition [CRD](deploy/crds/qlik.com_qliksenses_crd.yaml) need to be deployed first. The [sense-installer](https://github.com/qlik-oss/sense-installer) has command to do that (`qliksense opeartor crd install`) but it needs cluster level permission to do that. Then controller part need to be installed. The [sense-installer](https://github.com/qlik-oss/sense-installer) does it automatically and it does not require cluster level permission.
-
+      
 ## Operation Mode
 
-The qliksense operator works differently based on if the CR has git repo in it or not. The non-git CR looks like this
+The qliksense operator works differently based on if the CR has git repo in it or not. The non-git CR looks like this:
 
 ```yaml
 apiVersion: qlik.com/v1
