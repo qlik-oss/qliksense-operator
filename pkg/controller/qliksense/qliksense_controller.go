@@ -38,7 +38,7 @@ const (
 	qliksenseFinalizer     = "finalizer.qliksense.qlik.com"
 	searchingLabel         = "release"
 	gitOpsCJSuffix         = "-poorman-gitops"
-	maxDeletionWaitSeconds = 60 // 1 minutes
+	maxDeletionWaitSeconds = 90 // 1.5 minutes
 )
 
 /**
