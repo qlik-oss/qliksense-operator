@@ -8,7 +8,7 @@ Any Kubernetes operator has two parts 1. CRD 2. Controller. For qliksense operat
       
 ## Operation Mode
 
-The qliksense operator works differently based on if the CR has git repo in it or not. The non-git CR looks like this:
+The qliksense operator works differently based on if the CR has a git repo in it or not. The non-git CR looks like this:
 
 ```yaml
 apiVersion: qlik.com/v1
