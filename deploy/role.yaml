@@ -118,3 +118,15 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - engines.qixmanager.qlik.com
+  resources:
+  - engines
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
