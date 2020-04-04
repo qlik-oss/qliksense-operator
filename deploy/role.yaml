@@ -119,7 +119,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - engines.qixmanager.qlik.com
+  - qixmanager.qlik.com
   resources:
   - engines
   verbs:
