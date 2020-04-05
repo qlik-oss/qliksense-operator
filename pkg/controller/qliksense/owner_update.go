@@ -2,9 +2,11 @@ package qliksense
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batch_v1 "k8s.io/api/batch/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -45,6 +47,10 @@ func (r *ReconcileQliksense) updateResourceOwner(reqLogger logr.Logger, instance
 	}
 	if err := r.updateCronJobOwner(reqLogger, instance); err != nil {
 		reqLogger.Error(err, "cannot update cronjob owner")
+		return err
+	}
+	if err := r.updateJobOwner(reqLogger, instance); err != nil {
+		reqLogger.Error(err, "cannot update job owner")
 		return err
 	}
 	if err := r.updateServiceAccountOwner(reqLogger, instance); err != nil {
@@ -295,6 +301,33 @@ func (r *ReconcileQliksense) updateCronJobOwner(reqLogger logr.Logger, q *qlikv1
 			return err
 		}
 		reqLogger.Info("update owner for CronJob [ " + cm.Name + " ]")
+	}
+	return nil
+}
+func (r *ReconcileQliksense) updateJobOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
+
+	listObj := &batch_v1.JobList{}
+	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
+		return err
+	}
+	for _, cm := range listObj.Items {
+		alreadySet := false
+		for _, or := range cm.GetOwnerReferences() {
+			if or.Name == q.GetName() {
+				alreadySet = true
+				break
+			}
+		}
+		if alreadySet {
+			continue
+		}
+		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
+			return err
+		}
+		if err := r.client.Update(context.TODO(), &cm); err != nil {
+			return err
+		}
+		reqLogger.Info("update owner for Job [ " + cm.Name + " ]")
 	}
 	return nil
 }
