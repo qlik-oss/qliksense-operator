@@ -327,7 +327,7 @@ func (r *ReconcileQliksense) updateJobOwner(reqLogger logr.Logger, q *qlikv1.Qli
 		if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
-		reqLogger.Info("update owner for CronJob [ " + cm.Name + " ]")
+		reqLogger.Info("update owner for Job [ " + cm.Name + " ]")
 	}
 	return nil
 }
