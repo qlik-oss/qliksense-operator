@@ -65,6 +65,21 @@ spec:
                   type: object
                 type: array
               type: object
+            fetchSource:
+              properties:
+                accessToken:
+                  type: string
+                password:
+                  type: string
+                repository:
+                  type: string
+                secretName:
+                  type: string
+                userName:
+                  type: string
+              required:
+              - repository
+              type: object
             git:
               properties:
                 accessToken:
