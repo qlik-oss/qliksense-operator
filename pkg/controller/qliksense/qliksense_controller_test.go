@@ -2,6 +2,7 @@ package qliksense
 
 import (
 	"fmt"
+	"path"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -163,6 +164,49 @@ spec:
 				verify: func(t *testing.T, cronJob *batch_v1beta1.CronJob) {
 					cronJobImage := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 					expectedImage := fmt.Sprintf("%v/qliksense-repo-watcher", imageRegistry)
+					if cronJobImage != expectedImage {
+						t.Fatalf("expected cron job image to be: %v, but got: %v", expectedImage, cronJobImage)
+					}
+
+					if len(cronJob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets) != 1 {
+						t.Fatal("expected there to be imagePullSecrets")
+					} else if cronJob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets[0].Name != "artifactory-docker-secret" {
+						t.Fatalf("expected to find artifactory-docker-secret imagePullSecret, but the name was: %v",
+							cronJob.Spec.JobTemplate.Spec.Template.Spec.ImagePullSecrets[0].Name)
+					}
+				},
+			}
+		}(),
+		func() qliksenseControllerTestCase {
+			imageRegistry := "fooRegistry/some/path"
+			return qliksenseControllerTestCase{
+				name: "private imageRegistry with path set in CR",
+				cr: fmt.Sprintf(`
+apiVersion: qlik.com/v1
+kind: Qliksense
+metadata:
+ name: qlik-default
+ labels:
+    version: v0.0.2
+spec:
+  profile: docker-desktop
+  git:
+    repository: https://github.com/my-org/qliksense-k8s
+    accessToken: balallafafafaf
+  gitOps:
+    enabled: "yes"
+    schedule: "*/10 * * * *"
+    watchBranch: master
+    image: qlik-docker-oss.bintray.io/qliksense-repo-watcher
+  configs:
+    qliksense:
+    - name: imageRegistry
+      value: %v
+  rotateKeys: "no"
+`, imageRegistry),
+				verify: func(t *testing.T, cronJob *batch_v1beta1.CronJob) {
+					cronJobImage := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+					expectedImage := path.Join(imageRegistry, "qliksense-repo-watcher")
 					if cronJobImage != expectedImage {
 						t.Fatalf("expected cron job image to be: %v, but got: %v", expectedImage, cronJobImage)
 					}

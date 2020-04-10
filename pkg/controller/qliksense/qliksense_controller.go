@@ -2,7 +2,7 @@ package qliksense
 
 import (
 	"context"
-	"fmt"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -511,7 +511,7 @@ func updateCronJobForImageRegistry(m *qlikv1.Qliksense, cronJob *batch_v1beta1.C
 		if currentImage := podTemplateSpec.Containers[0].Image; currentImage != "" {
 			imageSegments := strings.Split(currentImage, "/")
 			imageNameAndTag := imageSegments[len(imageSegments)-1]
-			podTemplateSpec.Containers[0].Image = fmt.Sprintf("%v/%v", imageRegistry, imageNameAndTag)
+			podTemplateSpec.Containers[0].Image = path.Join(imageRegistry, imageNameAndTag)
 			podTemplateSpec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: pullSecretName}}
 		}
 	}
