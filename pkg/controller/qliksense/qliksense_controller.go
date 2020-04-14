@@ -2,7 +2,9 @@ package qliksense
 
 import (
 	"context"
+	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -39,6 +41,7 @@ const (
 	searchingLabel         = "release"
 	gitOpsCJSuffix         = "-poorman-gitops"
 	maxDeletionWaitSeconds = 90 // 1.5 minutes
+	pullSecretName         = "artifactory-docker-secret"
 )
 
 /**
@@ -497,8 +500,21 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 		},
 	}
 
+	updateCronJobForImageRegistry(m, cronJob)
 	controllerutil.SetControllerReference(m, cronJob, r.scheme)
 	return cronJob, nil
+}
+
+func updateCronJobForImageRegistry(m *qlikv1.Qliksense, cronJob *batch_v1beta1.CronJob) {
+	if imageRegistry := m.Spec.GetImageRegistry(); imageRegistry != "" {
+		podTemplateSpec := &cronJob.Spec.JobTemplate.Spec.Template.Spec
+		if currentImage := podTemplateSpec.Containers[0].Image; currentImage != "" {
+			imageSegments := strings.Split(currentImage, "/")
+			imageNameAndTag := imageSegments[len(imageSegments)-1]
+			podTemplateSpec.Containers[0].Image = path.Join(imageRegistry, imageNameAndTag)
+			podTemplateSpec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: pullSecretName}}
+		}
+	}
 }
 
 func (r *ReconcileQliksense) setCrStatus(reqLogger logr.Logger, m *qlikv1.Qliksense, sts, tps, reason string) error {
