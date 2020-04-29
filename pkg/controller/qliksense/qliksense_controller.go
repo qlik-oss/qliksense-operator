@@ -2,9 +2,7 @@ package qliksense
 
 import (
 	"context"
-	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -12,19 +10,16 @@ import (
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
-	batch_v1 "k8s.io/api/batch/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -298,7 +293,7 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 				return reconcile.Result{}, err
 			}
 		}
-		if instance.Spec.GitOps != nil {
+		if instance.Spec.OpsRunner != nil {
 			// next time jwt keys will not be updated
 			instance.Spec.RotateKeys = "no"
 			if err := r.setupCronJob(reqLogger, instance); err != nil {
@@ -424,7 +419,7 @@ func (r *ReconcileQliksense) setupCronJob(reqLogger logr.Logger, m *qlikv1.Qliks
 	// Check if the Job already exists if not create one
 	job := &batch_v1beta1.CronJob{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: m.Name + gitOpsCJSuffix, Namespace: m.Namespace}, job)
-	if err == nil && m.Spec.GitOps.Enabled != "yes" {
+	if err == nil && m.Spec.OpsRunner.Enabled != "yes" {
 		if err = r.client.Delete(context.TODO(), job); err != nil {
 			reqLogger.Error(err, "Failed to delete CronJob")
 			return err
@@ -432,7 +427,7 @@ func (r *ReconcileQliksense) setupCronJob(reqLogger logr.Logger, m *qlikv1.Qliks
 		reqLogger.Info("Cronjob has been deleted", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
 		return nil
 	} else if err != nil && errors.IsNotFound(err) {
-		if m.Spec.GitOps.Enabled != "yes" {
+		if m.Spec.OpsRunner.Enabled != "yes" {
 			return nil
 		}
 		// Define a new Job
@@ -460,61 +455,6 @@ func (r *ReconcileQliksense) setupCronJob(reqLogger logr.Logger, m *qlikv1.Qliks
 		reqLogger.Info("CronJob already exists", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
 	}
 	return nil
-}
-
-// jobForExecutor returns a QseokExecutor Job object
-func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Qliksense) (*batch_v1beta1.CronJob, error) {
-	b, err := K8sToYaml(m)
-	if err != nil {
-		return nil, err
-	}
-	cronJob := &batch_v1beta1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name + gitOpsCJSuffix,
-			Namespace: m.Namespace,
-			Labels: map[string]string{
-				"release": m.Name,
-			},
-		},
-		Spec: batch_v1beta1.CronJobSpec{
-			Schedule: m.Spec.GitOps.Schedule,
-			JobTemplate: batch_v1beta1.JobTemplateSpec{
-				Spec: batch_v1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{{
-								Image: m.Spec.GitOps.Image,
-								Name:  m.Name + gitOpsCJSuffix,
-								Env: []corev1.EnvVar{
-									{
-										Name:  "YAML_CONF",
-										Value: string(b),
-									},
-								},
-							}},
-							RestartPolicy: "OnFailure",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	updateCronJobForImageRegistry(m, cronJob)
-	controllerutil.SetControllerReference(m, cronJob, r.scheme)
-	return cronJob, nil
-}
-
-func updateCronJobForImageRegistry(m *qlikv1.Qliksense, cronJob *batch_v1beta1.CronJob) {
-	if imageRegistry := m.Spec.GetImageRegistry(); imageRegistry != "" {
-		podTemplateSpec := &cronJob.Spec.JobTemplate.Spec.Template.Spec
-		if currentImage := podTemplateSpec.Containers[0].Image; currentImage != "" {
-			imageSegments := strings.Split(currentImage, "/")
-			imageNameAndTag := imageSegments[len(imageSegments)-1]
-			podTemplateSpec.Containers[0].Image = path.Join(imageRegistry, imageNameAndTag)
-			podTemplateSpec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: pullSecretName}}
-		}
-	}
 }
 
 func (r *ReconcileQliksense) setCrStatus(reqLogger logr.Logger, m *qlikv1.Qliksense, sts, tps, reason string) error {

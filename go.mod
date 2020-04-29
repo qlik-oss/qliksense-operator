@@ -5,8 +5,9 @@ go 1.13
 require (
 	github.com/go-logr/logr v0.1.0
 	github.com/google/uuid v1.1.1
+	github.com/gorilla/mux v1.7.1
 	github.com/operator-framework/operator-sdk v0.16.0
-	github.com/qlik-oss/k-apis v0.0.37
+	github.com/qlik-oss/k-apis v0.1.2
 
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.8
