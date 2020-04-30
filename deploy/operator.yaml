@@ -16,10 +16,10 @@ spec:
       containers:
         - name: qliksense-operator
           # Replace this with the built image name
-          image: qlik/qliksense-operator:kuz1
+          image: qlik/qliksense-operator:andriy-2
           command:
           - qliksense-operator
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: WATCH_NAMESPACE
               valueFrom:

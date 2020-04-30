@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/qlik-oss/qliksense-operator/cmd/server"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
@@ -123,7 +125,7 @@ func main() {
 
 	log.Info("Starting the Cmd.")
 
-	addKuzServer(ctx, cfg, namespace)
+	server.AddKuzServer(ctx, cfg, namespace)
 	// Start the Cmd
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
 		log.Error(err, "Manager exited non-zero")

@@ -1,12 +1,19 @@
-package main
+package server
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/gorilla/mux"
 
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,9 +31,10 @@ var (
 	KuzPort       int32 = 7000
 	kuzPortName         = "kuz-port"
 )
+
 var serverLog = logf.Log.WithName("kuz_server")
 
-func addKuzServer(ctx context.Context, cfg *rest.Config, namespace string) {
+func AddKuzServer(ctx context.Context, cfg *rest.Config, namespace string) {
 	go startHTTPServer()
 	servicePorts := []v1.ServicePort{
 		{Port: KuzPort, Name: kuzPortName, Protocol: v1.ProtocolTCP, TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: KuzPort}},
@@ -39,17 +47,64 @@ func addKuzServer(ctx context.Context, cfg *rest.Config, namespace string) {
 
 }
 
-func Ping(rw http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(rw, "Pong")
+func healthCheckHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(204)
+}
+
+func kuzHandler(w http.ResponseWriter, r *http.Request) {
+	type kuzObjectT struct {
+		Cr     string `json:"cr,omitempty"`
+		Config string `json:"config,omitempty"`
+	}
+	var kuzObject kuzObjectT
+	if err := json.NewDecoder(r.Body).Decode(&kuzObject); err != nil {
+		msg := "error decoding expected SON object from the HTTP request body"
+		serverLog.Error(err, msg)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	} else if crBytes, err := base64.StdEncoding.DecodeString(kuzObject.Cr); err != nil {
+		msg := "error base64 decoding cr"
+		serverLog.Error(err, msg)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	} else if configTarZipBytes, err := base64.StdEncoding.DecodeString(kuzObject.Config); err != nil {
+		msg := "error base64 decoding config"
+		serverLog.Error(err, msg)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	} else if tmpDir, err := ioutil.TempDir("", "test_kuz_server"); err != nil {
+		serverLog.Error(err, "error creating tmp directory")
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	} else if err := ioutil.WriteFile(filepath.Join(tmpDir, "CR.yaml"), crBytes, os.ModePerm); err != nil {
+		serverLog.Error(err, "error writing CR.yaml to tmp directory")
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	} else if err := ioutil.WriteFile(filepath.Join(tmpDir, "config.tgz"), configTarZipBytes, os.ModePerm); err != nil {
+		serverLog.Error(err, "error writing config.tgz to tmp directory")
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(200)
 }
 
 // StartHTTPServer starts the server in port 8000 using mux router
 func startHTTPServer() {
 	r := mux.NewRouter()
-	r.HandleFunc("/ping", Ping)
-	address := fmt.Sprintf("%s:%d", kuzServerHost, KuzPort)
-	serverLog.Info("Starting ku server server on 7000")
-	http.ListenAndServe(address, r)
+	r.HandleFunc("/health", healthCheckHandler).Methods("GET")
+	r.HandleFunc("/kuz", kuzHandler).Methods("POST")
+
+	srv := &http.Server{
+		Addr:         fmt.Sprintf("%s:%d", kuzServerHost, KuzPort),
+		WriteTimeout: time.Second * 60,
+		ReadTimeout:  time.Second * 30,
+		Handler:      r, // Pass our instance of gorilla/mux in.
+	}
+
+	serverLog.Info("starting kustomize server...")
+	if err := srv.ListenAndServe(); err != nil {
+		serverLog.Info(fmt.Sprintf("kustomize server terminated with error: %v", err))
+	}
 }
 
 func createKuzService(ctx context.Context, cfg *rest.Config, servicePorts []v1.ServicePort) (*v1.Service, error) {

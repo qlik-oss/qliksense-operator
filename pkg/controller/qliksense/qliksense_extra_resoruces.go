@@ -1,8 +1,13 @@
 package qliksense
 
 import (
+	"fmt"
 	"path"
 	"strings"
+
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
+
+	"github.com/qlik-oss/qliksense-operator/cmd/server"
 
 	"github.com/go-logr/logr"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
@@ -17,6 +22,10 @@ import (
 // jobForExecutor returns a QseokExecutor Job object
 func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Qliksense) (*batch_v1beta1.CronJob, error) {
 	b, err := K8sToYaml(m)
+	if err != nil {
+		return nil, err
+	}
+	operatorName, err := k8sutil.GetOperatorName()
 	if err != nil {
 		return nil, err
 	}
@@ -35,24 +44,33 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{
-								Image: m.Spec.OpsRunner.Image,
-								Name:  m.Name + gitOpsCJSuffix,
+								Image:           m.Spec.OpsRunner.Image,
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								Name:            m.Name + gitOpsCJSuffix,
 								Env: []corev1.EnvVar{
 									{
 										Name:  "YAML_CONF",
 										Value: string(b),
 									},
-								},
-							}},
-							RestartPolicy: "OnFailure",
-							Volumes: []corev1.Volume{{
-								Name: m.Name + gitOpsCJSuffix,
-								VolumeSource: corev1.VolumeSource{
-									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-										ClaimName: m.Name + gitOpsCJSuffix,
+									{
+										Name:  "OPERATOR_SERVICE_NAME",
+										Value: fmt.Sprintf("%s-kuztomize", operatorName),
+									},
+									{
+										Name:  "OPERATOR_SERVICE_PORT",
+										Value: fmt.Sprintf("%v", server.KuzPort),
 									},
 								},
 							}},
+							RestartPolicy: "OnFailure",
+							//Volumes: []corev1.Volume{{
+							//	Name: m.Name + gitOpsCJSuffix,
+							//	VolumeSource: corev1.VolumeSource{
+							//		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							//			ClaimName: m.Name + gitOpsCJSuffix,
+							//		},
+							//	},
+							//}},
 						},
 					},
 				},
