@@ -59,7 +59,7 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 									},
 								},
 							}},
-							RestartPolicy: "OnFailure",
+							RestartPolicy: corev1.RestartPolicyNever,
 							//Volumes: []corev1.Volume{{
 							//	Name: m.Name + gitOpsCJSuffix,
 							//	VolumeSource: corev1.VolumeSource{

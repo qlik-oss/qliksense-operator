@@ -130,6 +130,7 @@ func createTarGz(itemName string, itemBytes []byte) ([]byte, error) {
 }
 
 func patchAndKustomizeConfig(cr []byte, configPath string) ([]byte, error) {
+	serverLog.Info(fmt.Sprintf("kuz_server patching/kustomizing for CR: %v", string(cr)))
 	var kcr kapis_config.KApiCr
 	dec := machine_yaml.NewYAMLOrJSONDecoder(bytes.NewReader(cr), 10000)
 	if err := dec.Decode(&kcr); err != nil {
