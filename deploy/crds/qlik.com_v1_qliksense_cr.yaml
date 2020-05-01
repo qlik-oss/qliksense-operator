@@ -14,7 +14,7 @@ spec:
     enabled: "yes"
     schedule: "*/2 * * * *"
     watchBranch: master
-    image: qliksense-repo-watcher:andriy-2 # any image that will watch the repo and pull and apply those into cluster
+    image: qlik/qliksense-repo-watcher:latest
   secrets:
     qliksense:
       - name: mongoDbUri
@@ -23,4 +23,4 @@ spec:
     qliksense:
       - name: acceptEULA
         value: "yes"
-  rotateKeys: "no"
+  rotateKeys: "yes"

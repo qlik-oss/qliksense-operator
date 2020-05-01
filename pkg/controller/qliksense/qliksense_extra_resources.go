@@ -5,11 +5,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
-
-	"github.com/qlik-oss/qliksense-operator/cmd/server"
-
 	"github.com/go-logr/logr"
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	batch_v1 "k8s.io/api/batch/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
@@ -21,11 +18,11 @@ import (
 
 // jobForExecutor returns a QseokExecutor Job object
 func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Qliksense) (*batch_v1beta1.CronJob, error) {
-	b, err := K8sToYaml(m)
+	operatorName, err := k8sutil.GetOperatorName()
 	if err != nil {
 		return nil, err
 	}
-	operatorName, err := k8sutil.GetOperatorName()
+	b, err := K8sToYaml(m)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +55,7 @@ func (r *ReconcileQliksense) cronJobForGitOps(reqLogger logr.Logger, m *qlikv1.Q
 									},
 									{
 										Name:  "OPERATOR_SERVICE_PORT",
-										Value: fmt.Sprintf("%v", server.KuzPort),
+										Value: fmt.Sprintf("%v", kuzServicePort),
 									},
 								},
 							}},
