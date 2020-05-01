@@ -20,10 +20,6 @@ import (
 )
 
 func Test_startKuzHttpServer_kuzHandler(t *testing.T) {
-	if err := os.Setenv("OPERATOR_NAME", "qliksense-operator"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	srv := startKuzHttpServer("localhost", 8080)
 	defer srv.Close()
 
