@@ -5,6 +5,10 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	batch_v1 "k8s.io/api/batch/v1"
+
 	"github.com/go-logr/logr"
 	operator_status "github.com/operator-framework/operator-sdk/pkg/status"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
@@ -34,10 +38,23 @@ var log = logf.Log.WithName("controller_qliksense")
 const (
 	qliksenseFinalizer     = "finalizer.qliksense.qlik.com"
 	searchingLabel         = "release"
-	gitOpsCJSuffix         = "-poorman-gitops"
+	opsRunnerJobNameSuffix = "-ops-runner"
 	maxDeletionWaitSeconds = 90 // 1.5 minutes
 	pullSecretName         = "artifactory-docker-secret"
 )
+
+type OpsRunnerJobKind string
+
+const (
+	OpsRunnerJobKindCronJob    OpsRunnerJobKind = "CronJob"
+	OpsRunnerJobKindRegularJob OpsRunnerJobKind = "RegularJob"
+	OpsRunnerJobKindNone       OpsRunnerJobKind = "None"
+)
+
+type OpsRunnerJob struct {
+	Kind OpsRunnerJobKind
+	Job  interface{}
+}
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -296,10 +313,10 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		if instance.Spec.OpsRunner != nil {
 			// next time jwt keys will not be updated
 			instance.Spec.RotateKeys = "no"
-			if err := r.setupCronJob(reqLogger, instance); err != nil {
+			if err := r.setupOpsRunnerJob(reqLogger, instance); err != nil {
 				return reconcile.Result{}, err
 			}
-			r.setCrStatus(reqLogger, instance, "Valid", "GitOpsMode", "")
+			r.setCrStatus(reqLogger, instance, "Valid", "OpsRunnerMode", "")
 		} else {
 			r.setCrStatus(reqLogger, instance, "Valid", "GitMode", "")
 		}
@@ -413,46 +430,111 @@ func remove(list []string, s string) []string {
 	return list
 }
 
-// setupCronJob create a new cronjob if not exist, and delete the existing cronjob if enabled=no
-func (r *ReconcileQliksense) setupCronJob(reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+func getRequiredOpsRunnerJobKind(m *qlikv1.Qliksense) OpsRunnerJobKind {
+	if m.Spec.OpsRunner.Enabled != "yes" {
+		if m.Spec.OpsRunner.Schedule != "" {
+			return OpsRunnerJobKindCronJob
+		}
+		return OpsRunnerJobKindRegularJob
+	}
+	return OpsRunnerJobKindNone
+}
 
-	// Check if the Job already exists if not create one
-	job := &batch_v1beta1.CronJob{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: m.Name + gitOpsCJSuffix, Namespace: m.Namespace}, job)
-	if err == nil && m.Spec.OpsRunner.Enabled != "yes" {
-		if err = r.client.Delete(context.TODO(), job); err != nil {
-			reqLogger.Error(err, "Failed to delete CronJob")
-			return err
-		}
-		reqLogger.Info("Cronjob has been deleted", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
-		return nil
-	} else if err != nil && errors.IsNotFound(err) {
-		if m.Spec.OpsRunner.Enabled != "yes" {
-			return nil
-		}
-		// Define a new Job
-		job, err := r.cronJobForGitOps(reqLogger, m)
-		if err != nil {
-			return err
-		}
-		reqLogger.Info("Creating a new CronJob", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
+func (r *ReconcileQliksense) getCurrentOpsRunnerJob(reqLogger logr.Logger, m *qlikv1.Qliksense) (*OpsRunnerJob, error) {
+	reqLogger.Info("Trying to fetch OpsRunner CronJob...")
+	cronJob := &batch_v1beta1.CronJob{}
+	if err := r.client.Get(context.TODO(), types.NamespacedName{Name: m.Name + opsRunnerJobNameSuffix, Namespace: m.Namespace}, cronJob); err == nil {
+		return &OpsRunnerJob{
+			Kind: OpsRunnerJobKindCronJob,
+			Job:  cronJob,
+		}, nil
+	} else if !errors.IsNotFound(err) {
+		return nil, err
+	}
 
-		err = r.client.Create(context.TODO(), job)
-		if err != nil && !errors.IsAlreadyExists(err) {
-			reqLogger.Error(err, "Failed to create new CronJob", "CronJob.Namespace", job.Namespace, "Job.Name", job.Name)
+	reqLogger.Info("Trying to fetch OpsRunner regular Job...")
+	regularJob := &batch_v1.Job{}
+	if err := r.client.Get(context.TODO(), types.NamespacedName{Name: m.Name + opsRunnerJobNameSuffix, Namespace: m.Namespace}, regularJob); err == nil {
+		return &OpsRunnerJob{
+			Kind: OpsRunnerJobKindRegularJob,
+			Job:  regularJob,
+		}, nil
+	} else if !errors.IsNotFound(err) {
+		return nil, err
+	}
+
+	reqLogger.Info("Neither the OpsRunner CronJob nor the regular Job were found...")
+	return &OpsRunnerJob{
+		Kind: OpsRunnerJobKindNone,
+		Job:  nil,
+	}, nil
+}
+
+func (r *ReconcileQliksense) deleteCurrentOpsRunnerJob(reqLogger logr.Logger, opsRunnerJob *OpsRunnerJob) error {
+	if opsRunnerJob.Kind == OpsRunnerJobKindCronJob {
+		reqLogger.Info("Deleting OpsRunner CronJob")
+		return r.client.Delete(context.TODO(), opsRunnerJob.Job.(*batch_v1beta1.CronJob))
+	} else if opsRunnerJob.Kind == OpsRunnerJobKindRegularJob {
+		reqLogger.Info("Deleting OpsRunner Job")
+		return r.client.Delete(context.TODO(), opsRunnerJob.Job.(*batch_v1.Job))
+	}
+	reqLogger.Info("Nothing to delete")
+	return nil
+}
+
+func (r *ReconcileQliksense) createOpsRunnerJob(opsRunnerJobKind OpsRunnerJobKind, reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+	if opsRunnerJobKind == OpsRunnerJobKindCronJob {
+		reqLogger.Info("Configuring the OpsRunner CronJob...")
+		if contJob, err := r.getOpsRunnerCronJob(reqLogger, m); err != nil {
 			return err
-		}
-		if err != nil && errors.IsAlreadyExists(err) {
-			reqLogger.Info("CronJob already exist", "CronJob.Namespace", job.Namespace, "Job.Name", job.Name)
 		} else {
-			reqLogger.Info("CronJob has been created", "CronJob.Namespace", job.Namespace, "Job.Name", job.Name)
+			reqLogger.Info("Creating the OpsRunner CronJob", "CronJob.Namespace", contJob.Namespace, "CronJob.Name", contJob.Name)
+			return r.createAndValidateK8sJobObject(reqLogger, contJob, &contJob.ObjectMeta)
 		}
-	} else if err != nil && !errors.IsAlreadyExists(err) {
-		reqLogger.Error(err, "Failed to get CronJob")
-		return err
+	} else if opsRunnerJobKind == OpsRunnerJobKindRegularJob {
+		reqLogger.Info("Configuring the OpsRunner regular Job...")
+		if job, err := r.getOpsRunnerJob(reqLogger, m); err != nil {
+			return err
+		} else {
+			reqLogger.Info("Creating the OpsRunner job", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
+			return r.createAndValidateK8sJobObject(reqLogger, job, &job.ObjectMeta)
+		}
+	}
+	reqLogger.Info("Nothing to create")
+	return nil
+}
+
+func (r *ReconcileQliksense) createAndValidateK8sJobObject(reqLogger logr.Logger, job runtime.Object, jobMetadata *metav1.ObjectMeta) error {
+	if err := r.client.Create(context.TODO(), job); err == nil {
+		reqLogger.Info("Successfully created the OpsRunner job", "namespace", jobMetadata.Namespace, "name", jobMetadata.Name)
+		return nil
+	} else if errors.IsAlreadyExists(err) {
+		reqLogger.Info("OpsRunner job already exists", "namespace", jobMetadata.Namespace, "name", jobMetadata.Name)
+		return nil
 	} else {
-		// Job already exists - don't requeue
-		reqLogger.Info("CronJob already exists", "CronJob.Namespace", job.Namespace, "CronJob.Name", job.Name)
+		reqLogger.Error(err, "Failed to create the OpsRunner job", "namespace", jobMetadata.Namespace, "name", jobMetadata.Name)
+		return err
+	}
+}
+
+// setupOpsRunnerJob create a new job if it did not exist before, and delete an existing job if enabled=no
+func (r *ReconcileQliksense) setupOpsRunnerJob(reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+	requiredOpsRunnerJobKind := getRequiredOpsRunnerJobKind(m)
+	currentOpsRunnerJob, err := r.getCurrentOpsRunnerJob(reqLogger, m)
+	if err != nil {
+		reqLogger.Error(err, "Failed to retrieve current OpsRunner job")
+		return err
+	}
+	if requiredOpsRunnerJobKind == OpsRunnerJobKindNone {
+		if err := r.deleteCurrentOpsRunnerJob(reqLogger, currentOpsRunnerJob); err != nil {
+			reqLogger.Error(err, "Failed to delete current OpsRunner job")
+			return err
+		}
+	} else {
+		if err := r.createOpsRunnerJob(requiredOpsRunnerJobKind, reqLogger, m); err != nil {
+			reqLogger.Error(err, "Failed to delete current OpsRunner job")
+			return err
+		}
 	}
 	return nil
 }

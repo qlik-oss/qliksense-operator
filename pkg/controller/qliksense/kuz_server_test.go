@@ -102,7 +102,7 @@ spec:
 	if respBodyJsonBytes, err := ioutil.ReadAll(resp.Body); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	} else if err := json.Unmarshal(respBodyJsonBytes, &respBodyMap); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error unmarshalling response to json map, response: %v, error: %v", string(respBodyJsonBytes), err)
 	} else if manifestsTzpBytes, err := base64.StdEncoding.DecodeString(respBodyMap["manifests"]); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	} else if err := ioutil.WriteFile(filepath.Join(tmpDir, "manifests.tgz"), manifestsTzpBytes, os.ModePerm); err != nil {

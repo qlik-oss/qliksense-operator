@@ -36,7 +36,7 @@ spec:
   git:
     repository: https://github.com/my-org/qliksense-k8s
     accessToken: balallafafafaf
-  gitOps:
+  opsRunner:
     enabled: "yes"
     schedule: "*/10 * * * *"
     watchBranch: master
@@ -69,7 +69,7 @@ spec:
   git:
     repository: https://github.com/my-org/qliksense-k8s
     accessToken: balallafafafaf
-  gitOps:
+  opsRunner:
     enabled: "yes"
     schedule: "*/10 * * * *"
     watchBranch: master
@@ -107,7 +107,7 @@ spec:
   git:
     repository: https://github.com/my-org/qliksense-k8s
     accessToken: balallafafafaf
-  gitOps:
+  opsRunner:
     enabled: "yes"
     schedule: "*/10 * * * *"
     watchBranch: master
@@ -150,7 +150,7 @@ spec:
   git:
     repository: https://github.com/my-org/qliksense-k8s
     accessToken: balallafafafaf
-  gitOps:
+  opsRunner:
     enabled: "yes"
     schedule: "*/10 * * * *"
     watchBranch: master
@@ -193,7 +193,7 @@ spec:
   git:
     repository: https://github.com/my-org/qliksense-k8s
     accessToken: balallafafafaf
-  gitOps:
+  opsRunner:
     enabled: "yes"
     schedule: "*/10 * * * *"
     watchBranch: master
@@ -236,7 +236,7 @@ spec:
 			if err := yaml.Unmarshal([]byte(testCase.cr), m); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			cronJob, err := reconcileQliksense.cronJobForGitOps(reqLogger, m)
+			cronJob, err := reconcileQliksense.getOpsRunnerCronJob(reqLogger, m)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
