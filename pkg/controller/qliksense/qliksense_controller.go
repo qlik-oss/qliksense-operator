@@ -534,6 +534,12 @@ func (r *ReconcileQliksense) setupOpsRunnerJob(reqLogger logr.Logger, m *qlikv1.
 			return err
 		}
 	} else {
+		if currentOpsRunnerJob.Kind != requiredOpsRunnerJobKind {
+			if err := r.deleteCurrentOpsRunnerJob(reqLogger, currentOpsRunnerJob); err != nil {
+				reqLogger.Error(err, "Failed to delete current OpsRunner job")
+				return err
+			}
+		}
 		if err := r.createOpsRunnerJob(requiredOpsRunnerJobKind, reqLogger, m); err != nil {
 			reqLogger.Error(err, "Failed to delete current OpsRunner job")
 			return err
