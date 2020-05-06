@@ -255,27 +255,27 @@ func K8sToYaml(k8sObj interface{}) ([]byte, error) {
 	}
 }
 
-func IsGitOpsEnabled(spec *kapis_config.CRSpec) bool {
-	return spec.Git != nil &&
-		spec.Git.Repository != "" &&
-		spec.OpsRunner != nil &&
-		spec.OpsRunner.Enabled == "yes" &&
-		spec.OpsRunner.WatchBranch != "" &&
-		spec.OpsRunner.Schedule != "" &&
-		spec.OpsRunner.Image != ""
-}
-
-func IsOnlyGit(spec *kapis_config.CRSpec) bool {
-	b := spec.Git != nil && spec.Git.Repository != ""
-	return b && spec.OpsRunner == nil
-}
-func IsOnlyRunner(spec *kapis_config.CRSpec) bool {
-	b := spec.OpsRunner != nil && spec.OpsRunner.Enabled == "yes" && spec.OpsRunner.Image != ""
-	return b && spec.Git == nil
-}
-
-func IsGitRunner(spec *kapis_config.CRSpec) bool {
-	b := spec.Git != nil && spec.Git.Repository != ""
-	b2 := spec.OpsRunner != nil && spec.OpsRunner.Enabled == "yes" && spec.OpsRunner.Image != ""
-	return b && b2 && !IsGitOpsEnabled(spec)
-}
+//func IsGitOpsEnabled(spec *kapis_config.CRSpec) bool {
+//	return spec.Git != nil &&
+//		spec.Git.Repository != "" &&
+//		spec.OpsRunner != nil &&
+//		spec.OpsRunner.Enabled == "yes" &&
+//		spec.OpsRunner.WatchBranch != "" &&
+//		spec.OpsRunner.Schedule != "" &&
+//		spec.OpsRunner.Image != ""
+//}
+//
+//func IsOnlyGit(spec *kapis_config.CRSpec) bool {
+//	b := spec.Git != nil && spec.Git.Repository != ""
+//	return b && spec.OpsRunner == nil
+//}
+//func IsOnlyRunner(spec *kapis_config.CRSpec) bool {
+//	b := spec.OpsRunner != nil && spec.OpsRunner.Enabled == "yes" && spec.OpsRunner.Image != ""
+//	return b && spec.Git == nil
+//}
+//
+//func IsGitRunner(spec *kapis_config.CRSpec) bool {
+//	b := spec.Git != nil && spec.Git.Repository != ""
+//	b2 := spec.OpsRunner != nil && spec.OpsRunner.Enabled == "yes" && spec.OpsRunner.Image != ""
+//	return b && b2 && !IsGitOpsEnabled(spec)
+//}

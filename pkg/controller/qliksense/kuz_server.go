@@ -75,7 +75,7 @@ func kuzHandler(w http.ResponseWriter, r *http.Request) {
 	if crBytes, configTarZipBytes, err := parseKuzRequest(r); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	} else if configDir, configDirCleanup, err := stageKuzRequest(crBytes, configTarZipBytes); err != nil {
+	} else if configDir, configDirCleanup, err := stageKuzRequestConfig(configTarZipBytes); err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	} else {
@@ -137,6 +137,14 @@ func patchAndKustomizeConfig(cr []byte, configPath string) ([]byte, error) {
 		return nil, err
 	} else {
 		kcr.Spec.ManifestsRoot = configPath
+		//if the yes/no value happens to NOT be quoted in the original yaml string,
+		//then the above decode can convert the value to strings true/false instead of strings yes/no
+		if kcr.Spec.RotateKeys == "true" {
+			kcr.Spec.RotateKeys = "yes"
+		} else if kcr.Spec.RotateKeys == "false" {
+			kcr.Spec.RotateKeys = "no"
+		}
+		serverLog.Info("About to execute PatchAndKustomize", "CR", kcr)
 		return PatchAndKustomize(&kcr)
 	}
 }
@@ -164,7 +172,7 @@ func parseKuzRequest(r *http.Request) (crBytes []byte, configTarZipBytes []byte,
 	}
 }
 
-func stageKuzRequest(crBytes []byte, configTarZipBytes []byte) (configDir string, cleanup func(), err error) {
+func stageKuzRequestConfig(configTarZipBytes []byte) (configDir string, cleanup func(), err error) {
 	tmpDir, err := ioutil.TempDir("", "test_kuz_server")
 	if err != nil {
 		serverLog.Error(err, "error creating tmp directory")
@@ -179,10 +187,7 @@ func stageKuzRequest(crBytes []byte, configTarZipBytes []byte) (configDir string
 	configArchive := filepath.Join(tmpDir, "config.tgz")
 	configDir = filepath.Join(tmpDir, "config")
 
-	if err = ioutil.WriteFile(filepath.Join(tmpDir, "CR.yaml"), crBytes, os.ModePerm); err != nil {
-		serverLog.Error(err, "error writing CR.yaml to tmp directory")
-		return "", nil, err
-	} else if err = ioutil.WriteFile(configArchive, configTarZipBytes, os.ModePerm); err != nil {
+	if err = ioutil.WriteFile(configArchive, configTarZipBytes, os.ModePerm); err != nil {
 		serverLog.Error(err, "error writing config.tgz to tmp directory")
 		return "", nil, err
 	} else if err = os.MkdirAll(configDir, os.ModePerm); err != nil {

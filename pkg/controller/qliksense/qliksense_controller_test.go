@@ -14,13 +14,12 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-type qliksenseControllerTestCase struct {
-	name   string
-	cr     string
-	verify func(t *testing.T, cronJob *batch_v1beta1.CronJob)
-}
-
 func Test_cronJobForGitOps(t *testing.T) {
+	type qliksenseControllerTestCase struct {
+		name   string
+		cr     string
+		verify func(t *testing.T, cronJob *batch_v1beta1.CronJob)
+	}
 	var testCases = []qliksenseControllerTestCase{
 		{
 			name: "private imageRegistry NOT set in CR",

@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	kapis_config "github.com/qlik-oss/k-apis/pkg/config"
+	machine_yaml "k8s.io/apimachinery/pkg/util/yaml"
+
 	"sigs.k8s.io/kustomize/api/k8sdeps/kunstruct"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
@@ -137,5 +140,61 @@ func Test_createTarGz(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	} else if string(fooBytes) != "foobar" {
 		t.Fatalf("expected: %v, but got: %v", "foobar", string(fooBytes))
+	}
+}
+
+func Test_CR_decode(t *testing.T) {
+	type testCaseT struct {
+		name   string
+		cr     string
+		verify func(t *testing.T, kcr *kapis_config.KApiCr)
+	}
+	var testCases = []testCaseT{
+		{
+			name: "expect yes to true conversion",
+			cr:   "apiVersion: qlik.com/v1\nkind: Qliksense\nmetadata:\n  annotations:\n    kubectl.kubernetes.io/last-applied-configuration: |\n      {\"apiVersion\":\"qlik.com/v1\",\"kind\":\"Qliksense\",\"metadata\":{\"annotations\":{},\"labels\":{\"version\":\"v0.0.8\"},\"name\":\"qlik-default\",\"namespace\":\"default\"},\"spec\":{\"configs\":{\"qliksense\":[{\"name\":\"acceptEULA\",\"value\":\"yes\"}]},\"git\":{\"accessToken\":\"\",\"repository\":\"\",\"userName\":\"\"},\"opsRunner\":{\"enabled\":\"yes\",\"image\":\"qlik/qliksense-repo-watcher:andriy-burnt-runner-4\",\"schedule\":\"\",\"watchBranch\":\"\"},\"profile\":\"docker-desktop\",\"rotateKeys\":\"yes\",\"secrets\":{\"qliksense\":[{\"name\":\"mongoDbUri\",\"value\":\"mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\"}]}}}\n  generation: 1\n  labels:\n    version: v0.0.8\n  name: qlik-default\n  namespace: default\n  resourceVersion: \"260103\"\n  selfLink: /apis/qlik.com/v1/namespaces/default/qliksenses/qlik-default/status\n  uid: 028c7a19-6b4d-4971-8e1b-7a39f617dcbc\nspec:\n  configs:\n    qliksense:\n    - name: acceptEULA\n      value: \"yes\"\n  git:\n    repository: \"\"\n  opsRunner:\n    enabled: \"yes\"\n    image: qlik/qliksense-repo-watcher:andriy-burnt-runner-4\n  profile: docker-desktop\n  rotateKeys: yes\n  secrets:\n    qliksense:\n    - name: mongoDbUri\n      value: mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\nstatus:\n  conditions:\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: CliMode\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: Initialized\n",
+			verify: func(t *testing.T, kcr *kapis_config.KApiCr) {
+				if kcr.Spec.RotateKeys != "true" {
+					t.Fatalf("expected rotateKeys to be true, but it was: %v", kcr.Spec.RotateKeys)
+				}
+			},
+		},
+		{
+			name: "expect no to false conversion",
+			cr:   "apiVersion: qlik.com/v1\nkind: Qliksense\nmetadata:\n  annotations:\n    kubectl.kubernetes.io/last-applied-configuration: |\n      {\"apiVersion\":\"qlik.com/v1\",\"kind\":\"Qliksense\",\"metadata\":{\"annotations\":{},\"labels\":{\"version\":\"v0.0.8\"},\"name\":\"qlik-default\",\"namespace\":\"default\"},\"spec\":{\"configs\":{\"qliksense\":[{\"name\":\"acceptEULA\",\"value\":\"yes\"}]},\"git\":{\"accessToken\":\"\",\"repository\":\"\",\"userName\":\"\"},\"opsRunner\":{\"enabled\":\"yes\",\"image\":\"qlik/qliksense-repo-watcher:andriy-burnt-runner-4\",\"schedule\":\"\",\"watchBranch\":\"\"},\"profile\":\"docker-desktop\",\"rotateKeys\":\"yes\",\"secrets\":{\"qliksense\":[{\"name\":\"mongoDbUri\",\"value\":\"mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\"}]}}}\n  generation: 1\n  labels:\n    version: v0.0.8\n  name: qlik-default\n  namespace: default\n  resourceVersion: \"260103\"\n  selfLink: /apis/qlik.com/v1/namespaces/default/qliksenses/qlik-default/status\n  uid: 028c7a19-6b4d-4971-8e1b-7a39f617dcbc\nspec:\n  configs:\n    qliksense:\n    - name: acceptEULA\n      value: \"yes\"\n  git:\n    repository: \"\"\n  opsRunner:\n    enabled: \"yes\"\n    image: qlik/qliksense-repo-watcher:andriy-burnt-runner-4\n  profile: docker-desktop\n  rotateKeys: no\n  secrets:\n    qliksense:\n    - name: mongoDbUri\n      value: mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\nstatus:\n  conditions:\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: CliMode\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: Initialized\n",
+			verify: func(t *testing.T, kcr *kapis_config.KApiCr) {
+				if kcr.Spec.RotateKeys != "false" {
+					t.Fatalf("expected rotateKeys to be false, but it was: %v", kcr.Spec.RotateKeys)
+				}
+			},
+		},
+		{
+			name: `expect "yes" to yes conversion`,
+			cr:   "apiVersion: qlik.com/v1\nkind: Qliksense\nmetadata:\n  annotations:\n    kubectl.kubernetes.io/last-applied-configuration: |\n      {\"apiVersion\":\"qlik.com/v1\",\"kind\":\"Qliksense\",\"metadata\":{\"annotations\":{},\"labels\":{\"version\":\"v0.0.8\"},\"name\":\"qlik-default\",\"namespace\":\"default\"},\"spec\":{\"configs\":{\"qliksense\":[{\"name\":\"acceptEULA\",\"value\":\"yes\"}]},\"git\":{\"accessToken\":\"\",\"repository\":\"\",\"userName\":\"\"},\"opsRunner\":{\"enabled\":\"yes\",\"image\":\"qlik/qliksense-repo-watcher:andriy-burnt-runner-4\",\"schedule\":\"\",\"watchBranch\":\"\"},\"profile\":\"docker-desktop\",\"rotateKeys\":\"yes\",\"secrets\":{\"qliksense\":[{\"name\":\"mongoDbUri\",\"value\":\"mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\"}]}}}\n  generation: 1\n  labels:\n    version: v0.0.8\n  name: qlik-default\n  namespace: default\n  resourceVersion: \"260103\"\n  selfLink: /apis/qlik.com/v1/namespaces/default/qliksenses/qlik-default/status\n  uid: 028c7a19-6b4d-4971-8e1b-7a39f617dcbc\nspec:\n  configs:\n    qliksense:\n    - name: acceptEULA\n      value: \"yes\"\n  git:\n    repository: \"\"\n  opsRunner:\n    enabled: \"yes\"\n    image: qlik/qliksense-repo-watcher:andriy-burnt-runner-4\n  profile: docker-desktop\n  rotateKeys: \"yes\"\n  secrets:\n    qliksense:\n    - name: mongoDbUri\n      value: mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\nstatus:\n  conditions:\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: CliMode\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: Initialized\n",
+			verify: func(t *testing.T, kcr *kapis_config.KApiCr) {
+				if kcr.Spec.RotateKeys != "yes" {
+					t.Fatalf("expected rotateKeys to be yes, but it was: %v", kcr.Spec.RotateKeys)
+				}
+			},
+		},
+		{
+			name: `expect "no" to no conversion`,
+			cr:   "apiVersion: qlik.com/v1\nkind: Qliksense\nmetadata:\n  annotations:\n    kubectl.kubernetes.io/last-applied-configuration: |\n      {\"apiVersion\":\"qlik.com/v1\",\"kind\":\"Qliksense\",\"metadata\":{\"annotations\":{},\"labels\":{\"version\":\"v0.0.8\"},\"name\":\"qlik-default\",\"namespace\":\"default\"},\"spec\":{\"configs\":{\"qliksense\":[{\"name\":\"acceptEULA\",\"value\":\"yes\"}]},\"git\":{\"accessToken\":\"\",\"repository\":\"\",\"userName\":\"\"},\"opsRunner\":{\"enabled\":\"yes\",\"image\":\"qlik/qliksense-repo-watcher:andriy-burnt-runner-4\",\"schedule\":\"\",\"watchBranch\":\"\"},\"profile\":\"docker-desktop\",\"rotateKeys\":\"yes\",\"secrets\":{\"qliksense\":[{\"name\":\"mongoDbUri\",\"value\":\"mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\"}]}}}\n  generation: 1\n  labels:\n    version: v0.0.8\n  name: qlik-default\n  namespace: default\n  resourceVersion: \"260103\"\n  selfLink: /apis/qlik.com/v1/namespaces/default/qliksenses/qlik-default/status\n  uid: 028c7a19-6b4d-4971-8e1b-7a39f617dcbc\nspec:\n  configs:\n    qliksense:\n    - name: acceptEULA\n      value: \"yes\"\n  git:\n    repository: \"\"\n  opsRunner:\n    enabled: \"yes\"\n    image: qlik/qliksense-repo-watcher:andriy-burnt-runner-4\n  profile: docker-desktop\n  rotateKeys: \"no\"\n  secrets:\n    qliksense:\n    - name: mongoDbUri\n      value: mongodb://qlik-default-mongodb:27017/qliksense?ssl=false\nstatus:\n  conditions:\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: CliMode\n  - lastTransitionTime: \"2020-05-06T06:15:17Z\"\n    status: Valid\n    type: Initialized\n",
+			verify: func(t *testing.T, kcr *kapis_config.KApiCr) {
+				if kcr.Spec.RotateKeys != "no" {
+					t.Fatalf("expected rotateKeys to be no, but it was: %v", kcr.Spec.RotateKeys)
+				}
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var kcr kapis_config.KApiCr
+			dec := machine_yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(testCase.cr)), 10000)
+			if err := dec.Decode(&kcr); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			testCase.verify(t, &kcr)
+		})
 	}
 }

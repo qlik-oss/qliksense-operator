@@ -5,20 +5,18 @@ import (
 	"strconv"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	batch_v1 "k8s.io/api/batch/v1"
-
 	"github.com/go-logr/logr"
 	operator_status "github.com/operator-framework/operator-sdk/pkg/status"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	_ "gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
+	batch_v1 "k8s.io/api/batch/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/discovery"
@@ -303,26 +301,31 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 			reqLogger.Error(err, "Cannot create qliksense object")
 			return reconcile.Result{}, nil
 		}
+
+		reqLogger.Info("Checking if Qliksense is installed...")
 		if !r.qlikInstances.IsInstalled(instance.GetName()) {
+			reqLogger.Info("Qliksense is not installed, installing...")
 			// new install
 			if err := r.qlikInstances.installQliksene(instance); err != nil {
 				reqLogger.Error(err, "Cannot create kubernetes resoruces for "+instance.GetName())
 				return reconcile.Result{}, err
 			}
-		}
-		if instance.Spec.OpsRunner != nil {
-			// next time jwt keys will not be updated
-			instance.Spec.RotateKeys = "no"
-			if err := r.setupOpsRunnerJob(reqLogger, instance); err != nil {
-				return reconcile.Result{}, err
-			}
-			r.setCrStatus(reqLogger, instance, "Valid", "OpsRunnerMode", "")
 		} else {
-			r.setCrStatus(reqLogger, instance, "Valid", "GitMode", "")
+			reqLogger.Info("Qliksense is already installed...")
 		}
-
 	} else {
 		r.setCrStatus(reqLogger, instance, "Valid", "CliMode", "")
+	}
+
+	if instance.Spec.OpsRunner != nil {
+		// next time jwt keys will not be updated
+		instance.Spec.RotateKeys = "no"
+		if err := r.setupOpsRunnerJob(reqLogger, instance); err != nil {
+			return reconcile.Result{}, err
+		}
+		r.setCrStatus(reqLogger, instance, "Valid", "OpsRunnerMode", "")
+	} else {
+		r.setCrStatus(reqLogger, instance, "Valid", "GitMode", "")
 	}
 
 	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
@@ -431,7 +434,7 @@ func remove(list []string, s string) []string {
 }
 
 func getRequiredOpsRunnerJobKind(m *qlikv1.Qliksense) OpsRunnerJobKind {
-	if m.Spec.OpsRunner.Enabled != "yes" {
+	if m.Spec.OpsRunner.Enabled == "yes" {
 		if m.Spec.OpsRunner.Schedule != "" {
 			return OpsRunnerJobKindCronJob
 		}
