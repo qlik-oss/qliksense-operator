@@ -12,9 +12,9 @@ spec:
     userName: ""
   opsRunner:
     enabled: "yes"
-    schedule: "*/2 * * * *"
+    schedule: "*/10 * * * *"
     watchBranch: master
-    image: qlik/qliksense-repo-watcher:latest
+    image: qlik-docker-oss.bintray.io/qliksense-gitops-runner:latest
   secrets:
     qliksense:
       - name: mongoDbUri
