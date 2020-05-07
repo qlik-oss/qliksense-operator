@@ -3,6 +3,7 @@ module github.com/qlik-oss/qliksense-operator
 go 1.13
 
 require (
+	github.com/banzaicloud/k8s-objectmatcher v1.3.0
 	github.com/go-logr/logr v0.1.0
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.2
@@ -12,8 +13,8 @@ require (
 
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.8
-	k8s.io/api v0.17.2
-	k8s.io/apimachinery v0.17.2
+	k8s.io/api v0.17.4
+	k8s.io/apimachinery v0.17.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 	sigs.k8s.io/controller-runtime v0.4.0

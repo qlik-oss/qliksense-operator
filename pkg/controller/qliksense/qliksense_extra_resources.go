@@ -16,18 +16,22 @@ import (
 )
 
 func (r *ReconcileQliksense) getOpsRunnerCronJob(reqLogger logr.Logger, m *qlikv1.Qliksense) (*batch_v1beta1.CronJob, error) {
-	podSpec, err := r.getJobPodSpec(reqLogger, m)
-	if err != nil {
+	podSpec := corev1.PodSpec{}
+	if err := r.updateJobPodSpec(&podSpec, reqLogger, m); err != nil {
 		return nil, err
 	}
+
+	objectMeta := metav1.ObjectMeta{}
+	updateJobMetadata(&objectMeta, m)
+
 	cronJob := &batch_v1beta1.CronJob{
-		ObjectMeta: *getJobMetadata(m),
+		ObjectMeta: objectMeta,
 		Spec: batch_v1beta1.CronJobSpec{
 			Schedule: m.Spec.OpsRunner.Schedule,
 			JobTemplate: batch_v1beta1.JobTemplateSpec{
 				Spec: batch_v1.JobSpec{
 					Template: corev1.PodTemplateSpec{
-						Spec: *podSpec,
+						Spec: podSpec,
 					},
 				},
 			},
@@ -41,17 +45,33 @@ func (r *ReconcileQliksense) getOpsRunnerCronJob(reqLogger logr.Logger, m *qlikv
 	return cronJob, nil
 }
 
+func (r *ReconcileQliksense) updateOpsRunnerCronJob(cronJob *batch_v1beta1.CronJob, reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+	if err := r.updateJobPodSpec(&cronJob.Spec.JobTemplate.Spec.Template.Spec, reqLogger, m); err != nil {
+		return err
+	}
+	updateJobMetadata(&cronJob.ObjectMeta, m)
+	cronJob.Spec.Schedule = m.Spec.OpsRunner.Schedule
+	if err := controllerutil.SetControllerReference(m, cronJob, r.scheme); err != nil {
+		reqLogger.Error(err, "Error setting controller reference for cronJob")
+		return err
+	}
+	return nil
+}
+
 func (r *ReconcileQliksense) getOpsRunnerJob(reqLogger logr.Logger, m *qlikv1.Qliksense) (*batch_v1.Job, error) {
-	podSpec, err := r.getJobPodSpec(reqLogger, m)
-	if err != nil {
-		reqLogger.Error(err, "Error configuring the job PodSpec")
+	podSpec := corev1.PodSpec{}
+	if err := r.updateJobPodSpec(&podSpec, reqLogger, m); err != nil {
 		return nil, err
 	}
+
+	objectMeta := metav1.ObjectMeta{}
+	updateJobMetadata(&objectMeta, m)
+
 	job := &batch_v1.Job{
-		ObjectMeta: *getJobMetadata(m),
+		ObjectMeta: objectMeta,
 		Spec: batch_v1.JobSpec{
 			Template: corev1.PodTemplateSpec{
-				Spec: *podSpec,
+				Spec: podSpec,
 			},
 		},
 	}
@@ -63,51 +83,75 @@ func (r *ReconcileQliksense) getOpsRunnerJob(reqLogger logr.Logger, m *qlikv1.Ql
 	return job, nil
 }
 
-func getJobMetadata(m *qlikv1.Qliksense) *metav1.ObjectMeta {
-	return &metav1.ObjectMeta{
-		Name:      m.Name + opsRunnerJobNameSuffix,
-		Namespace: m.Namespace,
-		Labels: map[string]string{
-			"release": m.Name,
-		},
+func (r *ReconcileQliksense) updateOpsRunnerJob(job *batch_v1.Job, reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+	if err := r.updateJobPodSpec(&job.Spec.Template.Spec, reqLogger, m); err != nil {
+		return err
 	}
+	updateJobMetadata(&job.ObjectMeta, m)
+	if err := controllerutil.SetControllerReference(m, job, r.scheme); err != nil {
+		reqLogger.Error(err, "Error setting controller reference for job")
+		return err
+	}
+	return nil
 }
 
-func (r *ReconcileQliksense) getJobPodSpec(reqLogger logr.Logger, m *qlikv1.Qliksense) (*corev1.PodSpec, error) {
+func updateJobMetadata(objectMeta *metav1.ObjectMeta, m *qlikv1.Qliksense) {
+	objectMeta.Name = fmt.Sprintf("%v%v", m.Name, opsRunnerJobNameSuffix)
+	objectMeta.Namespace = m.Namespace
+	if objectMeta.Labels == nil {
+		objectMeta.Labels = make(map[string]string)
+	}
+	objectMeta.Labels["release"] = m.Name
+}
+
+func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger logr.Logger, m *qlikv1.Qliksense) error {
 	operatorName, err := k8sutil.GetOperatorName()
 	if err != nil {
 		reqLogger.Error(err, "Error obtaining operator name")
-		return nil, err
+		return err
 	}
 	b, err := K8sToYaml(m)
 	if err != nil {
 		reqLogger.Error(err, "Error marshalling CR to yaml")
-		return nil, err
+		return err
 	}
-	podSpec := &corev1.PodSpec{
-		Containers: []corev1.Container{{
-			Image:           m.Spec.OpsRunner.Image,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Name:            m.Name + opsRunnerJobNameSuffix,
-			Env: []corev1.EnvVar{
-				{
-					Name:  "YAML_CONF",
-					Value: string(b),
-				},
-				{
-					Name:  "OPERATOR_SERVICE_NAME",
-					Value: fmt.Sprintf("%s-kuztomize", operatorName),
-				},
-				{
-					Name:  "OPERATOR_SERVICE_PORT",
-					Value: fmt.Sprintf("%v", kuzServicePort),
-				},
-			},
-		}},
-		RestartPolicy: corev1.RestartPolicyNever,
+	if len(podSpec.Containers) == 0 {
+		podSpec.Containers = append(podSpec.Containers, corev1.Container{})
 	}
+	podSpec.Containers[0].Image = m.Spec.OpsRunner.Image
+	podSpec.Containers[0].ImagePullPolicy = corev1.PullIfNotPresent
+	podSpec.Containers[0].Name = fmt.Sprintf("%v%v", m.Name, opsRunnerJobNameSuffix)
+
+	updateVars := []corev1.EnvVar{
+		{
+			Name:  "YAML_CONF",
+			Value: string(b),
+		},
+		{
+			Name:  "OPERATOR_SERVICE_NAME",
+			Value: fmt.Sprintf("%s-kuztomize", operatorName),
+		},
+		{
+			Name:  "OPERATOR_SERVICE_PORT",
+			Value: fmt.Sprintf("%v", kuzServicePort),
+		},
+	}
+	for _, updateVar := range updateVars {
+		found := false
+		for _, presentVar := range podSpec.Containers[0].Env {
+			if presentVar.Name == updateVar.Name {
+				found = true
+				presentVar.Value = updateVar.Value
+				break
+			}
+		}
+		if !found {
+			podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, updateVar)
+		}
+	}
+	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	updateJobPodSpecForImageRegistry(m, podSpec)
-	return podSpec, nil
+	return nil
 }
 
 func updateJobPodSpecForImageRegistry(m *qlikv1.Qliksense, podTemplateSpec *corev1.PodSpec) {
