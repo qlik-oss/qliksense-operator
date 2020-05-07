@@ -2,6 +2,7 @@ package qliksense
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strings"
 
@@ -105,6 +106,14 @@ func updateJobMetadata(objectMeta *metav1.ObjectMeta, m *qlikv1.Qliksense) {
 }
 
 func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger logr.Logger, m *qlikv1.Qliksense) error {
+	containerImagePullPolicy := os.Getenv("DEBUG_OPS_RUNNER_CONTAINER_IMAGE_PULL_POLICY")
+	if containerImagePullPolicy == "" {
+		containerImagePullPolicy = string(corev1.PullAlways)
+	}
+	podSpecRestartPolicy := os.Getenv("DEBUG_OPS_RUNNER_POD_SPEC_RESTART_POLICY")
+	if podSpecRestartPolicy == "" {
+		podSpecRestartPolicy = string(corev1.RestartPolicyOnFailure)
+	}
 	operatorName, err := k8sutil.GetOperatorName()
 	if err != nil {
 		reqLogger.Error(err, "Error obtaining operator name")
@@ -119,7 +128,7 @@ func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger
 		podSpec.Containers = append(podSpec.Containers, corev1.Container{})
 	}
 	podSpec.Containers[0].Image = m.Spec.OpsRunner.Image
-	podSpec.Containers[0].ImagePullPolicy = corev1.PullIfNotPresent
+	podSpec.Containers[0].ImagePullPolicy = corev1.PullPolicy(containerImagePullPolicy)
 	podSpec.Containers[0].Name = fmt.Sprintf("%v%v", m.Name, opsRunnerJobNameSuffix)
 
 	updateVars := []corev1.EnvVar{
@@ -149,7 +158,7 @@ func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger
 			podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, updateVar)
 		}
 	}
-	podSpec.RestartPolicy = corev1.RestartPolicyNever
+	podSpec.RestartPolicy = corev1.RestartPolicy(podSpecRestartPolicy)
 	updateJobPodSpecForImageRegistry(m, podSpec)
 	return nil
 }
