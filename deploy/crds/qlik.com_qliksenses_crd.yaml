@@ -95,8 +95,12 @@ spec:
               required:
               - repository
               type: object
-            gitOps:
+            manifestsRoot:
+              type: string
+            opsRunner:
               properties:
+                crPvc:
+                  type: string
                 enabled:
                   type: string
                 image:
@@ -106,8 +110,6 @@ spec:
                 watchBranch:
                   type: string
               type: object
-            manifestsRoot:
-              type: string
             profile:
               description: relative to manifestsRoot folder, ex. ./manifests/base
               type: string

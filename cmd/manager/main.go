@@ -5,16 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"runtime"
-
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/client-go/rest"
-
-	"github.com/qlik-oss/qliksense-operator/pkg/apis"
-	"github.com/qlik-oss/qliksense-operator/pkg/controller"
-	"github.com/qlik-oss/qliksense-operator/version"
+	"time"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"
@@ -22,10 +16,16 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	"github.com/operator-framework/operator-sdk/pkg/metrics"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
+	"github.com/qlik-oss/qliksense-operator/pkg/apis"
+	"github.com/qlik-oss/qliksense-operator/pkg/controller"
+	"github.com/qlik-oss/qliksense-operator/pkg/controller/qliksense"
+	"github.com/qlik-oss/qliksense-operator/version"
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	_ "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -123,11 +123,27 @@ func main() {
 
 	log.Info("Starting the Cmd.")
 
+	srv, err := qliksense.ConfigureAndStartKuzServer(ctx, cfg, namespace)
+	if err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
 	// Start the Cmd
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
 		log.Error(err, "Manager exited non-zero")
+
+		shutdownHttpServer(srv, 2*time.Second)
 		os.Exit(1)
 	}
+
+	shutdownHttpServer(srv, 2*time.Second)
+}
+
+func shutdownHttpServer(srv *http.Server, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
 }
 
 // addMetrics will create the Services and Service Monitors to allow the operator export the metrics by using

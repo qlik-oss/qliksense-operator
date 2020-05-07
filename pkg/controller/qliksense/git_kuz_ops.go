@@ -177,28 +177,27 @@ func executeKustomizeBuild(directory string) ([]byte, error) {
 	return resMap.AsYaml()
 }
 
-func (qi *QliksenseInstances) installQliksene(qse *qlikv1.Qliksense) error {
-	mfestRoot := qi.ManifestRootMap[qse.GetName()]
-	qse.Spec.ManifestsRoot = mfestRoot
-	kcr := convertToKApiCr(qse)
-	// generate patches
-	// empty string should use in-cluster config
+func PatchAndKustomize(kcr *kapis_config.KApiCr) ([]byte, error) {
+	kuzLogger := getKuzLogger()
 	dirName, _ := ioutil.TempDir("", "")
 	if err := os.Setenv("EJSON_KEYDIR", dirName); err != nil {
-		getKuzLogger().Error(err, "cannot set env for EJSON_KEYDIR")
+		kuzLogger.Error(err, "cannot set env for EJSON_KEYDIR")
 	}
-	getKuzLogger().Info("generating kustomize patches by k-api")
+	kuzLogger.Info("generating kustomize patches by k-api")
 	kapis_cr.GeneratePatches(kcr, "")
-	getKuzLogger().Info("executing kustomize build in folder " + filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
-	qInitByte, err := executeKustomizeBuild(filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
-	if err != nil {
+	kuzLogger.Info("executing kustomize build in folder " + filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
+	return executeKustomizeBuild(filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
+}
+
+func (qi *QliksenseInstances) installQliksene(qse *qlikv1.Qliksense) error {
+	manifestRoot := qi.ManifestRootMap[qse.GetName()]
+	qse.Spec.ManifestsRoot = manifestRoot
+	kcr := convertToKApiCr(qse)
+	if manifestBytes, err := PatchAndKustomize(kcr); err != nil {
+		return err
+	} else if err := KubectlApply(string(manifestBytes)); err != nil {
 		return err
 	}
-
-	if err := KubectlApply(string(qInitByte)); err != nil {
-		return err
-	}
-
 	return nil
 }
 

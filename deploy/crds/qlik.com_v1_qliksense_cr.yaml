@@ -1,7 +1,26 @@
 apiVersion: qlik.com/v1
 kind: Qliksense
 metadata:
-  name: example-qliksense
+  name: qlik-default
+  labels:
+    version: v0.0.8
 spec:
-  # Add fields here
-  size: 3
+  profile: docker-desktop
+  git:
+    repository: https://github.com/qlik-oss/qliksense-k8s
+    accessToken: ""
+    userName: ""
+  opsRunner:
+    enabled: "yes"
+    schedule: "*/10 * * * *"
+    watchBranch: master
+    image: qlik-docker-oss.bintray.io/qliksense-gitops-runner:latest
+  secrets:
+    qliksense:
+      - name: mongoDbUri
+        value: mongodb://qlik-default-mongodb:27017/qliksense?ssl=false
+  configs:
+    qliksense:
+      - name: acceptEULA
+        value: "yes"
+  rotateKeys: "yes"
