@@ -6,8 +6,6 @@ import (
 	"github.com/go-logr/logr"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	batch_v1 "k8s.io/api/batch/v1"
-	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -17,13 +15,17 @@ import (
 )
 
 func (r *ReconcileQliksense) deleteDeployments(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
-	opts := []client.DeleteAllOfOption{
-		client.InNamespace(q.GetNamespace()),
-		client.MatchingLabels{searchingLabel: q.GetName()},
-	}
-	if err := r.client.DeleteAllOf(context.TODO(), &appsv1.Deployment{}, opts...); err != nil {
+	// opts := []client.DeleteAllOfOption{
+	// 	client.InNamespace(q.GetNamespace()),
+	// 	client.MatchingLabels{searchingLabel: q.GetName()},
+	// }
+	// if err := r.client.DeleteAllOf(context.TODO(), &appsv1.Deployment{}, opts...); err != nil {
+	// 	reqLogger.Error(err, "Cannot delete deployments")
+	// 	return nil
+	// }
+	if err := KubectlDeleteResourceOfRelease("deployments", q.GetName()); err != nil {
 		reqLogger.Error(err, "Cannot delete deployments")
-		return nil
+		return err
 	}
 	reqLogger.Info("Deleting Deployements")
 	r.setCrStatus(reqLogger, q, "Valid", "DeletingDeployment", "User Initaited Action")
@@ -31,11 +33,15 @@ func (r *ReconcileQliksense) deleteDeployments(reqLogger logr.Logger, q *qlikv1.
 }
 
 func (r *ReconcileQliksense) deleteStatefuleSet(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
-	opts := []client.DeleteAllOfOption{
-		client.InNamespace(q.GetNamespace()),
-		client.MatchingLabels{searchingLabel: q.GetName()},
-	}
-	if err := r.client.DeleteAllOf(context.TODO(), &appsv1.StatefulSet{}, opts...); err != nil {
+	// opts := []client.DeleteAllOfOption{
+	// 	client.InNamespace(q.GetNamespace()),
+	// 	client.MatchingLabels{searchingLabel: q.GetName()},
+	// }
+	// if err := r.client.DeleteAllOf(context.TODO(), &appsv1.StatefulSet{}, opts...); err != nil {
+	// 	reqLogger.Error(err, "Cannot delete statefulset")
+	// 	return err
+	// }
+	if err := KubectlDeleteResourceOfRelease("statefulset", q.GetName()); err != nil {
 		reqLogger.Error(err, "Cannot delete statefulset")
 		return err
 	}
@@ -45,12 +51,16 @@ func (r *ReconcileQliksense) deleteStatefuleSet(reqLogger logr.Logger, q *qlikv1
 }
 
 func (r *ReconcileQliksense) deleteCronJob(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
-	opts := []client.DeleteAllOfOption{
-		client.InNamespace(q.GetNamespace()),
-		client.MatchingLabels{searchingLabel: q.GetName()},
-	}
-	if err := r.client.DeleteAllOf(context.TODO(), &batch_v1beta1.CronJob{}, opts...); err != nil {
-		reqLogger.Error(err, "Cannot delete cronjob")
+	// opts := []client.DeleteAllOfOption{
+	// 	client.InNamespace(q.GetNamespace()),
+	// 	client.MatchingLabels{searchingLabel: q.GetName()},
+	// }
+	// if err := r.client.DeleteAllOf(context.TODO(), &batch_v1beta1.CronJob{}, opts...); err != nil {
+	// 	reqLogger.Error(err, "Cannot delete cronjob")
+	// 	return err
+	// }
+	if err := KubectlDeleteResourceOfRelease("cronjob", q.GetName()); err != nil {
+		reqLogger.Error(err, "Cannot delete CronJobs")
 		return err
 	}
 	reqLogger.Info("Deleting CronJobs")
@@ -59,12 +69,16 @@ func (r *ReconcileQliksense) deleteCronJob(reqLogger logr.Logger, q *qlikv1.Qlik
 }
 
 func (r *ReconcileQliksense) deleteJob(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
-	opts := []client.DeleteAllOfOption{
-		client.InNamespace(q.GetNamespace()),
-		client.MatchingLabels{searchingLabel: q.GetName()},
-	}
-	if err := r.client.DeleteAllOf(context.TODO(), &batch_v1.Job{}, opts...); err != nil {
-		reqLogger.Error(err, "Cannot delete job")
+	// opts := []client.DeleteAllOfOption{
+	// 	client.InNamespace(q.GetNamespace()),
+	// 	client.MatchingLabels{searchingLabel: q.GetName()},
+	// }
+	// if err := r.client.DeleteAllOf(context.TODO(), &batch_v1.Job{}, opts...); err != nil {
+	// 	reqLogger.Error(err, "Cannot delete job")
+	// 	return err
+	// }
+	if err := KubectlDeleteResourceOfRelease("job", q.GetName()); err != nil {
+		reqLogger.Error(err, "Cannot delete jobs")
 		return err
 	}
 	reqLogger.Info("Deleting Jobs")
@@ -107,13 +121,17 @@ func (r *ReconcileQliksense) deleteEngine(reqLogger logr.Logger, q *qlikv1.Qliks
 }
 
 func (r *ReconcileQliksense) deletePods(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
-	opts := []client.DeleteAllOfOption{
-		client.InNamespace(q.GetNamespace()),
-		client.MatchingLabels{searchingLabel: q.GetName()},
-	}
-	if err := r.client.DeleteAllOf(context.TODO(), &corev1.Pod{}, opts...); err != nil {
+	// opts := []client.DeleteAllOfOption{
+	// 	client.InNamespace(q.GetNamespace()),
+	// 	client.MatchingLabels{searchingLabel: q.GetName()},
+	// }
+	// if err := r.client.DeleteAllOf(context.TODO(), &corev1.Pod{}, opts...); err != nil {
+	// 	reqLogger.Error(err, "Cannot delete pods")
+	// 	return nil
+	// }
+	if err := KubectlDeleteResourceOfRelease("pods", q.GetName()); err != nil {
 		reqLogger.Error(err, "Cannot delete pods")
-		return nil
+		return err
 	}
 	reqLogger.Info("Deleting Pods")
 	r.setCrStatus(reqLogger, q, "Valid", "DeletingPods", "User Initaited Action")

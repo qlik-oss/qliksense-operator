@@ -31,6 +31,7 @@ rules:
   - daemonsets
   - replicasets
   - statefulsets
+  - deployments/finalizers
   verbs:
   - create
   - delete
@@ -46,14 +47,6 @@ rules:
   verbs:
   - get
   - create
-- apiGroups:
-  - apps
-  resourceNames:
-  - qliksense-operator
-  resources:
-  - deployments/finalizers
-  verbs:
-  - update
 - apiGroups:
   - qlik.com
   resources:
@@ -71,6 +64,7 @@ rules:
   resources:
   - ingresses
   - networkpolicies
+  - deployments
   verbs:
   - create
   - delete

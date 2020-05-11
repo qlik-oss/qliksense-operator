@@ -209,6 +209,18 @@ func KubectlDelete(manifests string) error {
 	return kubectlOperation(manifests, "delete")
 }
 
+func KubectlDeleteResourceOfRelease(resourceType, releaseName string) error {
+	cmd := exec.Command("kubectl", "delete", resourceType, "-lrelease="+releaseName)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		getKuzLogger().Error(err, "cannot delete resources: "+resourceType+", release: "+releaseName)
+		return err
+	}
+	return nil
+}
+
 func kubectlOperation(manifests string, oprName string) error {
 	tempYaml, err := ioutil.TempFile("", "")
 	if err != nil {
