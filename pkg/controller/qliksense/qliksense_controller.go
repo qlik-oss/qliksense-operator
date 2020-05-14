@@ -2,7 +2,6 @@ package qliksense
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"time"
 
@@ -138,44 +137,12 @@ func getEventHandler() handler.EventHandler {
 	}
 }
 
-func getPredicate(logger logr.Logger) predicate.Predicate {
+func getPredicate(_ logr.Logger) predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			if patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectNew, e.ObjectOld); err != nil {
-				logger.Error(err, "Error calculating differences on object update event watch")
-				return true
-			} else if !patchResult.IsEmpty() && !isOnlyKubernetesLeaderAnnotationChange(patchResult.Patch) {
-				logger.Info("Found differences on object update event watch", "name", e.MetaNew.GetName(),
-					"namespace", e.MetaNew.GetNamespace(), "gvk", e.ObjectNew.GetObjectKind().GroupVersionKind().String())
-				return true
-			}
-			return false
+			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
 		},
 	}
-}
-
-func isOnlyKubernetesLeaderAnnotationChange(jsonPatch []byte) bool {
-	patchMap := make(map[string]interface{})
-	if err := json.Unmarshal(jsonPatch, &patchMap); err != nil {
-		return false
-	} else if metadata, metadataFound := patchMap["metadata"]; metadataFound && len(patchMap) == 1 {
-		if metadataMap, ok := metadata.(map[string]interface{}); ok {
-			annotations, annotationsFound := metadataMap["annotations"]
-			resourceVersion, resourceVersionFound := metadataMap["resourceVersion"]
-			if annotationsFound && resourceVersionFound && len(metadataMap) == 2 {
-				annotationsMap, annotationsIsAMap := annotations.(map[string]interface{})
-				_, resourceVersionIsAString := resourceVersion.(string)
-				if annotationsIsAMap && resourceVersionIsAString {
-					k8sLeaderAnnotation, k8sLeaderAnnotationFound := annotationsMap["control-plane.alpha.kubernetes.io/leader"]
-					if k8sLeaderAnnotationFound && len(annotationsMap) == 1 {
-						_, k8sLeaderAnnotationIsAString := k8sLeaderAnnotation.(string)
-						return k8sLeaderAnnotationIsAString
-					}
-				}
-			}
-		}
-	}
-	return false
 }
 
 // blank assignment to verify that ReconcileQliksense implements reconcile.Reconciler
