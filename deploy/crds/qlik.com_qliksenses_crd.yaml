@@ -146,6 +146,10 @@ spec:
               type: object
             storageClassName:
               type: string
+            tlsCertHost:
+              type: string
+            tlsCertOrg:
+              type: string
           required:
           - profile
           type: object

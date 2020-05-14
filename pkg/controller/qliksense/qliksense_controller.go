@@ -2,8 +2,14 @@ package qliksense
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	rbacv1 "k8s.io/api/rbac/v1"
 
 	"github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
@@ -15,7 +21,6 @@ import (
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,11 +28,9 @@ import (
 	_ "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -73,6 +76,8 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
+	logger := log.WithName("event watch")
+
 	// Create a new controller
 	c, err := controller.New("qliksense-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -80,149 +85,97 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource Qliksense
-	err = c.Watch(&source.Kind{Type: &qlikv1.Qliksense{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
+	if err := c.Watch(&source.Kind{Type: &qlikv1.Qliksense{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner Qliksense
-	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	// Watch for changes to secondary resources and requeue for the the reconciliation by the owner Qliksense
+	if err := c.Watch(&source.Kind{Type: &corev1.Service{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &corev1.Secret{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &corev1.ServiceAccount{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &corev1.ServiceAccount{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &corev1.PersistentVolumeClaim{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &corev1.PersistentVolumeClaim{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &v1beta1.Ingress{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &v1beta1.Ingress{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-
-	err = c.Watch(&source.Kind{Type: &batch_v1beta1.CronJob{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &batch_v1beta1.CronJob{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &rbacv1.Role{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &batch_v1.Job{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
-	}
-	err = c.Watch(&source.Kind{Type: &rbacv1.RoleBinding{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &qlikv1.Qliksense{},
-	}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Ignore updates to CR status in which case metadata.Generation does not change
-			return e.MetaOld.GetGeneration() != e.MetaNew.GetGeneration()
-		},
-	})
-	if err != nil {
+	} else if err := c.Watch(&source.Kind{Type: &rbacv1.Role{}}, getEventHandler(), getPredicate(logger)); err != nil {
+		return err
+	} else if err := c.Watch(&source.Kind{Type: &rbacv1.RoleBinding{}}, getEventHandler(), getPredicate(logger)); err != nil {
 		return err
 	}
 
 	//cannot watch engine resources. because we dont know the type yet
 	return nil
+}
+
+func getEventHandler() handler.EventHandler {
+	return &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+			if release, ok := a.Meta.GetLabels()[searchingLabel]; ok {
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Name:      release,
+							Namespace: a.Meta.GetNamespace(),
+						},
+					},
+				}
+			}
+			return nil
+		}),
+	}
+}
+
+func getPredicate(logger logr.Logger) predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			if patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectNew, e.ObjectOld); err != nil {
+				logger.Error(err, "Error calculating differences on object update event watch")
+				return true
+			} else if !patchResult.IsEmpty() && !isOnlyKubernetesLeaderAnnotationChange(patchResult.Patch) {
+				logger.Info("Found differences on object update event watch", "name", e.MetaNew.GetName(),
+					"namespace", e.MetaNew.GetNamespace(), "gvk", e.ObjectNew.GetObjectKind().GroupVersionKind().String())
+				return true
+			}
+			return false
+		},
+	}
+}
+
+func isOnlyKubernetesLeaderAnnotationChange(jsonPatch []byte) bool {
+	patchMap := make(map[string]interface{})
+	if err := json.Unmarshal(jsonPatch, &patchMap); err != nil {
+		return false
+	} else if metadata, metadataFound := patchMap["metadata"]; metadataFound && len(patchMap) == 1 {
+		if metadataMap, ok := metadata.(map[string]interface{}); ok {
+			annotations, annotationsFound := metadataMap["annotations"]
+			resourceVersion, resourceVersionFound := metadataMap["resourceVersion"]
+			if annotationsFound && resourceVersionFound && len(metadataMap) == 2 {
+				annotationsMap, annotationsIsAMap := annotations.(map[string]interface{})
+				_, resourceVersionIsAString := resourceVersion.(string)
+				if annotationsIsAMap && resourceVersionIsAString {
+					k8sLeaderAnnotation, k8sLeaderAnnotationFound := annotationsMap["control-plane.alpha.kubernetes.io/leader"]
+					if k8sLeaderAnnotationFound && len(annotationsMap) == 1 {
+						_, k8sLeaderAnnotationIsAString := k8sLeaderAnnotation.(string)
+						return k8sLeaderAnnotationIsAString
+					}
+				}
+			}
+		}
+	}
+	return false
 }
 
 // blank assignment to verify that ReconcileQliksense implements reconcile.Reconciler
@@ -523,8 +476,6 @@ func (r *ReconcileQliksense) applyOpsRunnerCronJob(currentOpsRunnerJob *OpsRunne
 		reqLogger.Info("Configuring a new OpsRunner CronJob...")
 		if cronJob, err = r.getOpsRunnerCronJob(reqLogger, m); err != nil {
 			return err
-		} else if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(cronJob); err != nil {
-			return err
 		}
 	}
 	reqLogger.Info("Applying the OpsRunner CronJob", "CronJob.Namespace", cronJob.Namespace, "CronJob.Name", cronJob.Name)
@@ -558,6 +509,10 @@ func (r *ReconcileQliksense) applyOpsRunnerRegularJob(currentOpsRunnerJob *OpsRu
 }
 
 func (r *ReconcileQliksense) applyK8sJobObject(reqLogger logr.Logger, job runtime.Object, jobMetadata *metav1.ObjectMeta, exists bool) error {
+	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(job); err != nil {
+		return err
+	}
+
 	if !exists {
 		reqLogger.Info("Creating OpsRunner job...", "namespace", jobMetadata.Namespace, "name", jobMetadata.Name)
 		if err := r.client.Create(context.TODO(), job); err == nil {
@@ -601,7 +556,7 @@ func (r *ReconcileQliksense) setupOpsRunnerJob(reqLogger logr.Logger, m *qlikv1.
 			currentOpsRunnerJob.Job = nil
 		}
 		if err := r.applyOpsRunnerJob(currentOpsRunnerJob, requiredOpsRunnerJobKind, reqLogger, m); err != nil {
-			reqLogger.Error(err, "Failed to delete current OpsRunner job")
+			reqLogger.Error(err, "Failed to apply current OpsRunner job")
 			return err
 		}
 	}
