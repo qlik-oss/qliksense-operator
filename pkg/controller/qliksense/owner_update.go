@@ -100,8 +100,7 @@ func (r *ReconcileQliksense) updateServiceOwner(reqLogger logr.Logger, q *qlikv1
 		}
 		if err := controllerutil.SetControllerReference(q, &svc, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &svc); err != nil {
+		} else if err := r.client.Update(context.TODO(), &svc); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for service [ " + svc.Name + " ]")
@@ -128,8 +127,7 @@ func (r *ReconcileQliksense) updateDeploymentOwner(reqLogger logr.Logger, q *qli
 		}
 		if err := controllerutil.SetControllerReference(q, &dep, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &dep); err != nil {
+		} else if err := r.client.Update(context.TODO(), &dep); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for deployment [ " + dep.Name + " ]")
@@ -156,8 +154,7 @@ func (r *ReconcileQliksense) updateStatefulSetOwner(reqLogger logr.Logger, q *ql
 		}
 		if err := controllerutil.SetControllerReference(q, &dep, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &dep); err != nil {
+		} else if err := r.client.Update(context.TODO(), &dep); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for statefulset [ " + dep.Name + " ]")
@@ -184,8 +181,7 @@ func (r *ReconcileQliksense) updateIngressOwner(reqLogger logr.Logger, q *qlikv1
 		}
 		if err := controllerutil.SetControllerReference(q, &ing, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &ing); err != nil {
+		} else if err := r.client.Update(context.TODO(), &ing); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for Ingress [ " + ing.Name + " ]")
@@ -212,8 +208,7 @@ func (r *ReconcileQliksense) updateConfigMapOwner(reqLogger logr.Logger, q *qlik
 		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for ConfigMap [ " + cm.Name + " ]")
@@ -240,8 +235,7 @@ func (r *ReconcileQliksense) updateSecretsOwner(reqLogger logr.Logger, q *qlikv1
 		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for Secrets [ " + cm.Name + " ]")
@@ -268,8 +262,7 @@ func (r *ReconcileQliksense) updatePvcOwner(reqLogger logr.Logger, q *qlikv1.Qli
 		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for pvc [ " + cm.Name + " ]")
@@ -296,8 +289,7 @@ func (r *ReconcileQliksense) updateCronJobOwner(reqLogger logr.Logger, q *qlikv1
 		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for CronJob [ " + cm.Name + " ]")
@@ -310,9 +302,9 @@ func (r *ReconcileQliksense) updateJobOwner(reqLogger logr.Logger, q *qlikv1.Qli
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
-	for _, cm := range listObj.Items {
+	for _, job := range listObj.Items {
 		alreadySet := false
-		for _, or := range cm.GetOwnerReferences() {
+		for _, or := range job.GetOwnerReferences() {
 			if or.Name == q.GetName() {
 				alreadySet = true
 				break
@@ -321,13 +313,15 @@ func (r *ReconcileQliksense) updateJobOwner(reqLogger logr.Logger, q *qlikv1.Qli
 		if alreadySet {
 			continue
 		}
-		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
+		if err := controllerutil.SetControllerReference(q, &job, r.scheme); err != nil {
+			if alreadyOwnedError, isAlreadyOwnedError := err.(*controllerutil.AlreadyOwnedError); !isAlreadyOwnedError || alreadyOwnedError.Owner.Kind != "CronJob" {
+				return err
+			}
+		} else if err := r.client.Update(context.TODO(), &job); err != nil {
 			return err
+		} else {
+			reqLogger.Info("update owner for Job [ " + job.Name + " ]")
 		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
-			return err
-		}
-		reqLogger.Info("update owner for Job [ " + cm.Name + " ]")
 	}
 	return nil
 }
@@ -351,8 +345,7 @@ func (r *ReconcileQliksense) updateServiceAccountOwner(reqLogger logr.Logger, q 
 		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for ServiceAccount [ " + cm.Name + " ]")
@@ -379,8 +372,7 @@ func (r *ReconcileQliksense) updateRoleOwner(reqLogger logr.Logger, q *qlikv1.Ql
 		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for Role [ " + cm.Name + " ]")
@@ -407,8 +399,7 @@ func (r *ReconcileQliksense) updateRoleBindingOwner(reqLogger logr.Logger, q *ql
 		}
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for RoleBinding [ " + cm.Name + " ]")
@@ -433,11 +424,9 @@ func (r *ReconcileQliksense) updateNetworkPolicyOwner(reqLogger logr.Logger, q *
 		if alreadySet {
 			continue
 		}
-		//fmt.Println(svc.Name)
 		if err := controllerutil.SetControllerReference(q, &cm, r.scheme); err != nil {
 			return err
-		}
-		if err := r.client.Update(context.TODO(), &cm); err != nil {
+		} else if err := r.client.Update(context.TODO(), &cm); err != nil {
 			return err
 		}
 		reqLogger.Info("update owner for NetworkPolicy [ " + cm.Name + " ]")
