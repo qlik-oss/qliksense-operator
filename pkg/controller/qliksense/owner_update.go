@@ -9,7 +9,8 @@ import (
 	batch_v1 "k8s.io/api/batch/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
+	networking_v1 "k8s.io/api/networking/v1"
+	networking_v1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -164,7 +165,7 @@ func (r *ReconcileQliksense) updateStatefulSetOwner(reqLogger logr.Logger, q *ql
 
 func (r *ReconcileQliksense) updateIngressOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
-	listObj := &v1beta1.IngressList{}
+	listObj := &networking_v1beta1.IngressList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
@@ -409,7 +410,7 @@ func (r *ReconcileQliksense) updateRoleBindingOwner(reqLogger logr.Logger, q *ql
 
 func (r *ReconcileQliksense) updateNetworkPolicyOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
 
-	listObj := &v1beta1.NetworkPolicyList{}
+	listObj := &networking_v1.NetworkPolicyList{}
 	if err := r.client.List(context.TODO(), listObj, client.MatchingLabels{searchingLabel: q.Name}); err != nil {
 		return err
 	}
