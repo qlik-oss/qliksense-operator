@@ -159,6 +159,7 @@ func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger
 		}
 	}
 	podSpec.RestartPolicy = corev1.RestartPolicy(podSpecRestartPolicy)
+	podSpec.ServiceAccountName = "qliksense-operator"
 	updateJobPodSpecForImageRegistry(m, podSpec)
 	return nil
 }
