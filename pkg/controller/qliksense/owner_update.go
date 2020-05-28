@@ -74,9 +74,18 @@ func (r *ReconcileQliksense) updateResourceOwner(reqLogger logr.Logger, instance
 		reqLogger.Error(err, "cannot update ingress owner")
 		return err
 	}
-	if err := r.updateEngineOwner(reqLogger, instance); err != nil {
-		reqLogger.Error(err, "cannot update Engine owner")
-		return err
+
+	groupVersionResources := []schema.GroupVersionResource{
+		{Group: "qixengine.qlik.com", Version: "v1", Resource: "engines"},
+		{Group: "qixengine.qlik.com", Version: "v1", Resource: "enginetemplates"},
+		{Group: "qixengine.qlik.com", Version: "v1", Resource: "enginevariants"},
+		{Group: "qixmanager.qlik.com", Version: "v1", Resource: "engines"},
+	}
+	for _, groupVersionResource := range groupVersionResources {
+		if err := r.updateGroupVersionResourceOwner(reqLogger, instance, groupVersionResource); err != nil {
+			reqLogger.Error(err, "cannot update custom resource owner", "GroupVersionResource", groupVersionResource)
+			return err
+		}
 	}
 
 	return nil
@@ -436,7 +445,7 @@ func (r *ReconcileQliksense) updateNetworkPolicyOwner(reqLogger logr.Logger, q *
 }
 
 // TODO: use dynamic client for all other standard resources, so that only one method can be used
-func (r *ReconcileQliksense) updateEngineOwner(reqLogger logr.Logger, q *qlikv1.Qliksense) error {
+func (r *ReconcileQliksense) updateGroupVersionResourceOwner(reqLogger logr.Logger, q *qlikv1.Qliksense, groupVersionResource schema.GroupVersionResource) error {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -448,9 +457,7 @@ func (r *ReconcileQliksense) updateEngineOwner(reqLogger logr.Logger, q *qlikv1.
 		return err
 	}
 
-	engineRes := schema.GroupVersionResource{Group: "qixmanager.qlik.com", Version: "v1", Resource: "engines"}
-
-	list, err := dynamicClient.Resource(engineRes).Namespace(q.Namespace).List(metav1.ListOptions{})
+	list, err := dynamicClient.Resource(groupVersionResource).Namespace(q.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -474,11 +481,11 @@ func (r *ReconcileQliksense) updateEngineOwner(reqLogger logr.Logger, q *qlikv1.
 				continue
 			}
 			d.SetOwnerReferences([]metav1.OwnerReference{ref})
-			if _, updateErr := dynamicClient.Resource(engineRes).Namespace(q.Namespace).Update(&d, metav1.UpdateOptions{}); updateErr != nil {
+			if _, updateErr := dynamicClient.Resource(groupVersionResource).Namespace(q.Namespace).Update(&d, metav1.UpdateOptions{}); updateErr != nil {
 				return err
 			}
 		}
-		reqLogger.Info("update owner for Engine [ " + d.GetName() + " ]")
+		reqLogger.Info("update owner for custom resource", "GroupVersionResource", groupVersionResource)
 	}
 	return nil
 }
