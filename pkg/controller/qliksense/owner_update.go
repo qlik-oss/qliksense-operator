@@ -75,15 +75,25 @@ func (r *ReconcileQliksense) updateResourceOwner(reqLogger logr.Logger, instance
 		return err
 	}
 
-	groupVersionResources := []schema.GroupVersionResource{
+	customResources := []schema.GroupVersionResource{
+		{Group: "qixmanager.qlik.com", Version: "v1", Resource: "engines"},
 		{Group: "qixengine.qlik.com", Version: "v1", Resource: "engines"},
 		{Group: "qixengine.qlik.com", Version: "v1", Resource: "enginetemplates"},
 		{Group: "qixengine.qlik.com", Version: "v1", Resource: "enginevariants"},
-		{Group: "qixmanager.qlik.com", Version: "v1", Resource: "engines"},
 	}
-	for _, groupVersionResource := range groupVersionResources {
-		if err := r.updateGroupVersionResourceOwner(reqLogger, instance, groupVersionResource); err != nil {
-			reqLogger.Error(err, "cannot update custom resource owner", "GroupVersionResource", groupVersionResource)
+	for _, customResource := range customResources {
+		if err := r.updateGroupVersionResourceOwner(reqLogger, instance, customResource); err != nil {
+			reqLogger.Error(err, "cannot update custom resource owner using dynamic client", "GroupVersionResource", customResource)
+			return err
+		}
+	}
+
+	regularResources := []schema.GroupVersionResource{
+		{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"},
+	}
+	for _, regularResource := range regularResources {
+		if err := r.updateGroupVersionResourceOwner(reqLogger, instance, regularResource); err != nil {
+			reqLogger.Error(err, "cannot update regular resource owner using dynamic client", "GroupVersionResource", regularResource)
 			return err
 		}
 	}
@@ -485,7 +495,7 @@ func (r *ReconcileQliksense) updateGroupVersionResourceOwner(reqLogger logr.Logg
 				return err
 			}
 		}
-		reqLogger.Info("update owner for custom resource", "GroupVersionResource", groupVersionResource)
+		reqLogger.Info("update owner for resource", "GroupVersionResource", groupVersionResource)
 	}
 	return nil
 }
