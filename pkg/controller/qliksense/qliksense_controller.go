@@ -217,8 +217,10 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 	*/
 
 	if instance.Spec.OpsRunner != nil {
-		// next time jwt keys will not be updated
-		instance.Spec.RotateKeys = "no"
+		if r.qlikInstances.IsInstalled(instance.GetName()) {
+			// next time jwt keys will not be updated
+			instance.Spec.RotateKeys = "no"
+		}
 		if err := r.setupOpsRunnerJob(reqLogger, instance); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -339,7 +341,7 @@ func remove(list []string, s string) []string {
 }
 
 func getRequiredOpsRunnerJobKind(m *qlikv1.Qliksense) OpsRunnerJobKind {
-	if m.Spec.OpsRunner.Enabled == "yes" {
+	if m.Spec.OpsRunner.Enabled == "true" {
 		if m.Spec.OpsRunner.Schedule != "" {
 			return OpsRunnerJobKindCronJob
 		}
