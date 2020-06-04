@@ -99,8 +99,6 @@ spec:
               type: string
             opsRunner:
               properties:
-                crPvc:
-                  type: string
                 enabled:
                   type: string
                 image:

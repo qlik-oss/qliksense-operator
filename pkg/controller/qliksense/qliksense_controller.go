@@ -216,37 +216,17 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 		}
 	*/
 
-	// if no git then it was a CLI deployed k8 resources
-	if instance.Spec.Git != nil && instance.Spec.Git.Repository != "" {
-		if err := r.qlikInstances.AddToQliksenseInstances(instance); err != nil {
-			reqLogger.Error(err, "Cannot create qliksense object")
-			return reconcile.Result{}, err
-		}
-
-		reqLogger.Info("Checking if Qliksense is installed...")
-		if !r.qlikInstances.IsInstalled(instance.GetName()) {
-			reqLogger.Info("Qliksense is not installed, installing...")
-			// new install
-			if err := r.qlikInstances.installQliksene(instance); err != nil {
-				reqLogger.Error(err, "Cannot create kubernetes resoruces for "+instance.GetName())
-				return reconcile.Result{}, err
-			}
-		} else {
-			reqLogger.Info("Qliksense is already installed...")
-		}
-	} else {
-		r.setCrStatus(reqLogger, instance, "Valid", "CliMode", "")
-	}
-
 	if instance.Spec.OpsRunner != nil {
-		// next time jwt keys will not be updated
-		instance.Spec.RotateKeys = "no"
+		if r.qlikInstances.IsInstalled(instance.GetName()) {
+			// next time jwt keys will not be updated
+			instance.Spec.RotateKeys = "no"
+		}
 		if err := r.setupOpsRunnerJob(reqLogger, instance); err != nil {
 			return reconcile.Result{}, err
 		}
 		r.setCrStatus(reqLogger, instance, "Valid", "OpsRunnerMode", "")
 	} else {
-		r.setCrStatus(reqLogger, instance, "Valid", "GitMode", "")
+		r.setCrStatus(reqLogger, instance, "Valid", "CliMode", "")
 	}
 
 	if err := r.updateResourceOwner(reqLogger, instance); err != nil {
@@ -361,7 +341,7 @@ func remove(list []string, s string) []string {
 }
 
 func getRequiredOpsRunnerJobKind(m *qlikv1.Qliksense) OpsRunnerJobKind {
-	if m.Spec.OpsRunner.Enabled == "yes" {
+	if m.Spec.OpsRunner.Enabled == "true" {
 		if m.Spec.OpsRunner.Schedule != "" {
 			return OpsRunnerJobKindCronJob
 		}
