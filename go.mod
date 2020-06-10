@@ -9,7 +9,7 @@ require (
 	github.com/gorilla/mux v1.7.2
 	github.com/mholt/archiver/v3 v3.3.0
 	github.com/operator-framework/operator-sdk v0.16.0
-	github.com/qlik-oss/k-apis v0.1.5
+	github.com/qlik-oss/k-apis v0.1.7
 
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.8
