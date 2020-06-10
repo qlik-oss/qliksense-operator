@@ -341,7 +341,7 @@ func remove(list []string, s string) []string {
 }
 
 func getRequiredOpsRunnerJobKind(m *qlikv1.Qliksense) OpsRunnerJobKind {
-	if m.Spec.OpsRunner.Enabled == "true" {
+	if m.Spec.OpsRunner.Enabled == "yes" {
 		if m.Spec.OpsRunner.Schedule != "" {
 			return OpsRunnerJobKindCronJob
 		}
