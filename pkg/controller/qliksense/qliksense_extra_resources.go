@@ -127,7 +127,7 @@ func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger
 		return err
 	} else {
 		podSpec.Containers[0].Env = envVars
-		reqLogger.Info("--AB: job's new podSpec.Containers[0].Env", "vars", podSpec.Containers[0].Env)
+		reqLogger.Info("job's new podSpec.Containers[0].Env", "vars", podSpec.Containers[0].Env)
 	}
 
 	podSpec.RestartPolicy = corev1.RestartPolicy(podSpecRestartPolicy)
