@@ -3,6 +3,8 @@ package qliksense
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/go-logr/logr"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -469,6 +471,10 @@ func (r *ReconcileQliksense) updateGroupVersionResourceOwner(reqLogger logr.Logg
 
 	list, err := dynamicClient.Resource(groupVersionResource).Namespace(q.Namespace).List(metav1.ListOptions{})
 	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("WARNING: cannot update ownership because resources are not found", "GroupVersionResource", groupVersionResource)
+			return nil
+		}
 		return err
 	}
 	// create owner reference object
