@@ -444,6 +444,11 @@ func (r *ReconcileQliksense) applyOpsRunnerRegularJob(currentOpsRunnerJob *OpsRu
 			return nil
 		} else {
 			reqLogger.Info("Existing OpsRunner regular Job needs to be updated...")
+			if err := r.deleteCurrentOpsRunnerJob(reqLogger, currentOpsRunnerJob); err != nil {
+				return err
+			} else if job, err = r.getOpsRunnerJob(reqLogger, m); err != nil {
+				return err
+			}
 		}
 	} else {
 		reqLogger.Info("Configuring a new OpsRunner regular Job...")

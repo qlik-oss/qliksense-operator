@@ -6,6 +6,8 @@ import (
 	"path"
 	"strings"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/go-logr/logr"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	qlikv1 "github.com/qlik-oss/qliksense-operator/pkg/apis/qlik/v1"
@@ -114,16 +116,6 @@ func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger
 	if podSpecRestartPolicy == "" {
 		podSpecRestartPolicy = string(corev1.RestartPolicyOnFailure)
 	}
-	operatorName, err := k8sutil.GetOperatorName()
-	if err != nil {
-		reqLogger.Error(err, "Error obtaining operator name")
-		return err
-	}
-	b, err := K8sToYaml(m)
-	if err != nil {
-		reqLogger.Error(err, "Error marshalling CR to yaml")
-		return err
-	}
 	if len(podSpec.Containers) == 0 {
 		podSpec.Containers = append(podSpec.Containers, corev1.Container{})
 	}
@@ -131,37 +123,89 @@ func (r *ReconcileQliksense) updateJobPodSpec(podSpec *corev1.PodSpec, reqLogger
 	podSpec.Containers[0].ImagePullPolicy = corev1.PullPolicy(containerImagePullPolicy)
 	podSpec.Containers[0].Name = fmt.Sprintf("%v%v", m.Name, opsRunnerJobNameSuffix)
 
-	updateVars := []corev1.EnvVar{
-		{
-			Name:  "YAML_CONF",
-			Value: string(b),
-		},
-		{
-			Name:  "OPERATOR_SERVICE_NAME",
-			Value: fmt.Sprintf("%s-kuztomize", operatorName),
-		},
-		{
-			Name:  "OPERATOR_SERVICE_PORT",
-			Value: fmt.Sprintf("%v", kuzServicePort),
-		},
+	if envVars, err := getEnvVars(podSpec, reqLogger, m); err != nil {
+		return err
+	} else {
+		podSpec.Containers[0].Env = envVars
+		reqLogger.Info("job's new podSpec.Containers[0].Env", "vars", podSpec.Containers[0].Env)
 	}
-	for _, updateVar := range updateVars {
-		found := false
-		for _, presentVar := range podSpec.Containers[0].Env {
-			if presentVar.Name == updateVar.Name {
-				found = true
-				presentVar.Value = updateVar.Value
-				break
-			}
-		}
-		if !found {
-			podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, updateVar)
-		}
-	}
+
 	podSpec.RestartPolicy = corev1.RestartPolicy(podSpecRestartPolicy)
 	podSpec.ServiceAccountName = "qliksense-operator"
 	updateJobPodSpecForImageRegistry(m, podSpec)
 	return nil
+}
+
+func crToYaml(m *qlikv1.Qliksense) ([]byte, error) {
+	rawMap := map[string]interface{}{}
+	if k8sSecretYamlBytes, err := yaml.Marshal(m); err != nil {
+		return nil, err
+	} else if err := yaml.Unmarshal(k8sSecretYamlBytes, &rawMap); err != nil {
+		return nil, err
+	} else {
+		deleteMetadataProperties := []string{
+			"creationTimestamp",
+			"finalizers",
+			"generation",
+			"resourceVersion",
+			"selfLink",
+			"uid",
+		}
+		metadataMap := rawMap["metadata"].(map[string]interface{})
+		for _, deleteMetadataProperty := range deleteMetadataProperties {
+			delete(metadataMap, deleteMetadataProperty)
+		}
+		if _, ok := metadataMap["annotations"]; ok {
+			annotationsMap := metadataMap["annotations"].(map[string]interface{})
+			delete(annotationsMap, "kubectl.kubernetes.io/last-applied-configuration")
+			if len(annotationsMap) == 0 {
+				delete(metadataMap, "annotations")
+			}
+		}
+		delete(rawMap, "status")
+		return yaml.Marshal(rawMap)
+	}
+}
+
+func getEnvVars(podSpec *corev1.PodSpec, reqLogger logr.Logger, m *qlikv1.Qliksense) ([]corev1.EnvVar, error) {
+	operatorName, err := k8sutil.GetOperatorName()
+	if err != nil {
+		reqLogger.Error(err, "Error obtaining operator name")
+		return nil, err
+	}
+
+	crYaml, err := crToYaml(m)
+	if err != nil {
+		reqLogger.Error(err, "Error marshalling CR to yaml")
+		return nil, err
+	}
+
+	updateVarNames := []string{"YAML_CONF", "OPERATOR_SERVICE_NAME", "OPERATOR_SERVICE_PORT"}
+	updateVarValues := map[string]string{
+		"YAML_CONF":             string(crYaml),
+		"OPERATOR_SERVICE_NAME": fmt.Sprintf("%s-kuztomize", operatorName),
+		"OPERATOR_SERVICE_PORT": fmt.Sprintf("%v", kuzServicePort),
+	}
+	currentEnvVarNames := make(map[string]bool)
+	currentEnvVars := podSpec.Containers[0].Env
+	newEnvVars := make([]corev1.EnvVar, 0)
+
+	for _, currentEnvVar := range currentEnvVars {
+		currentEnvVarNames[currentEnvVar.Name] = true
+		if updateVarValue, ok := updateVarValues[currentEnvVar.Name]; ok {
+			currentEnvVar.Value = updateVarValue
+		}
+		newEnvVars = append(newEnvVars, currentEnvVar)
+	}
+	for _, updateVarName := range updateVarNames {
+		if _, present := currentEnvVarNames[updateVarName]; !present {
+			newEnvVars = append(newEnvVars, corev1.EnvVar{
+				Name:  updateVarName,
+				Value: updateVarValues[updateVarName],
+			})
+		}
+	}
+	return newEnvVars, nil
 }
 
 func updateJobPodSpecForImageRegistry(m *qlikv1.Qliksense, podTemplateSpec *corev1.PodSpec) {
