@@ -23,4 +23,3 @@ spec:
     qliksense:
       - name: acceptEULA
         value: "yes"
-  rotateKeys: "yes"

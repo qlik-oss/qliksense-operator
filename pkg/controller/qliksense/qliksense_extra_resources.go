@@ -30,7 +30,8 @@ func (r *ReconcileQliksense) getOpsRunnerCronJob(reqLogger logr.Logger, m *qlikv
 	cronJob := &batch_v1beta1.CronJob{
 		ObjectMeta: objectMeta,
 		Spec: batch_v1beta1.CronJobSpec{
-			Schedule: m.Spec.OpsRunner.Schedule,
+			Schedule:          m.Spec.OpsRunner.Schedule,
+			ConcurrencyPolicy: batch_v1beta1.ForbidConcurrent,
 			JobTemplate: batch_v1beta1.JobTemplateSpec{
 				Spec: batch_v1.JobSpec{
 					Template: corev1.PodTemplateSpec{

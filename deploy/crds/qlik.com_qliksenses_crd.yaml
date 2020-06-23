@@ -53,32 +53,12 @@ spec:
                               type: string
                             name:
                               type: string
-                          required:
-                          - key
-                          - name
                           type: object
                       required:
                       - secretKeyRef
                       type: object
-                  required:
-                  - name
                   type: object
                 type: array
-              type: object
-            fetchSource:
-              properties:
-                accessToken:
-                  type: string
-                password:
-                  type: string
-                repository:
-                  type: string
-                secretName:
-                  type: string
-                userName:
-                  type: string
-              required:
-              - repository
               type: object
             git:
               properties:
@@ -92,8 +72,6 @@ spec:
                   type: string
                 userName:
                   type: string
-              required:
-              - repository
               type: object
             manifestsRoot:
               type: string
@@ -110,8 +88,6 @@ spec:
               type: object
             profile:
               description: relative to manifestsRoot folder, ex. ./manifests/base
-              type: string
-            rotateKeys:
               type: string
             secrets:
               additionalProperties:
@@ -130,15 +106,10 @@ spec:
                               type: string
                             name:
                               type: string
-                          required:
-                          - key
-                          - name
                           type: object
                       required:
                       - secretKeyRef
                       type: object
-                  required:
-                  - name
                   type: object
                 type: array
               type: object

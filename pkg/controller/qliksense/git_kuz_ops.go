@@ -184,7 +184,7 @@ func PatchAndKustomize(kcr *kapis_config.KApiCr) ([]byte, error) {
 		kuzLogger.Error(err, "cannot set env for EJSON_KEYDIR")
 	}
 	kuzLogger.Info("generating kustomize patches by k-api")
-	kapis_cr.GeneratePatches(kcr, "")
+	kapis_cr.GeneratePatches(kcr, kapis_config.KeysActionRestoreOrRotate, "")
 	kuzLogger.Info("executing kustomize build in folder " + filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
 	return executeKustomizeBuild(filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
 }
