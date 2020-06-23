@@ -137,13 +137,6 @@ func patchAndKustomizeConfig(cr []byte, configPath string) ([]byte, error) {
 		return nil, err
 	} else {
 		kcr.Spec.ManifestsRoot = configPath
-		//if the yes/no value happens to NOT be quoted in the original yaml string,
-		//then the above decode can convert the value to strings true/false instead of strings yes/no
-		if kcr.Spec.RotateKeys == "true" {
-			kcr.Spec.RotateKeys = "yes"
-		} else if kcr.Spec.RotateKeys == "false" {
-			kcr.Spec.RotateKeys = "no"
-		}
 		serverLog.Info("About to execute PatchAndKustomize", "CR", kcr)
 		return PatchAndKustomize(&kcr)
 	}

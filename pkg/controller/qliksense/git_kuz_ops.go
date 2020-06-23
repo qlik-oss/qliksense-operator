@@ -183,8 +183,16 @@ func PatchAndKustomize(kcr *kapis_config.KApiCr) ([]byte, error) {
 	if err := os.Setenv("EJSON_KEYDIR", dirName); err != nil {
 		kuzLogger.Error(err, "cannot set env for EJSON_KEYDIR")
 	}
+
 	kuzLogger.Info("generating kustomize patches by k-api")
-	kapis_cr.GeneratePatches(kcr, "")
+	kubeConfigPath := ""
+	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" {
+		// assume this is an automated test:
+		userHomeDir, _ := os.UserHomeDir()
+		kubeConfigPath = filepath.Join(userHomeDir, ".kube", "config")
+	}
+	kapis_cr.GeneratePatches(kcr, kapis_config.KeysActionRestoreOrRotate, kubeConfigPath)
+
 	kuzLogger.Info("executing kustomize build in folder " + filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
 	return executeKustomizeBuild(filepath.Join(kcr.Spec.GetManifestsRoot(), kcr.Spec.GetProfileDir()))
 }

@@ -217,10 +217,6 @@ func (r *ReconcileQliksense) Reconcile(request reconcile.Request) (reconcile.Res
 	*/
 
 	if instance.Spec.OpsRunner != nil {
-		if r.qlikInstances.IsInstalled(instance.GetName()) {
-			// next time jwt keys will not be updated
-			instance.Spec.RotateKeys = "no"
-		}
 		if err := r.setupOpsRunnerJob(reqLogger, instance); err != nil {
 			return reconcile.Result{}, err
 		}
